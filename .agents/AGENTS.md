@@ -112,4 +112,6 @@
 - 涉及前端开发、页面、客户端、显示、交互、动画或状态表达的任务, 必须先提供原型截图和交互说明。
 
 ## 原型设计
-原型设计请使用 shad/ui 完成
+- 原型设计请使用 shad/ui 完成
+- Unless the prototype is explicitly a single-page, single-flow interaction, do not place all prototype pages, workflows, states, and components in one page file. Split distinct functional flows or page-level states into routes, use shared components for reusable UI, and keep page files focused on composition and route-level data loading.
+- Before implementing a multi-page prototype, define the route and component boundaries in the interaction notes. Follow the project's existing router and component conventions; do not introduce a new routing framework only for this rule.

@@ -34,6 +34,9 @@
 
 原型使用 React、TypeScript、Tailwind CSS 和 shadcn/ui 实现。基础控件优先复用 shadcn/ui 的 Button、Card、Badge、Avatar、Tabs、Dialog、Sheet、Input、ScrollArea 和 Separator；图标统一使用 Lucide。图标按钮使用熟悉符号，并通过 `aria-label` 或 Tooltip 提供可访问名称。
 
+- 顶部状态栏右侧临时提供校园版预览切换按钮；开启后模拟当前用户为已认证学生用户并显示激活状态，关闭后恢复普通模式。
+- 校园版开启时，社区页面标题和底部导航标签同步显示为“校园”，不得出现“社区/校园”混用。
+
 ## 页面尺寸
 
 移动端基准画板为 390×844px。内容区应考虑顶部状态栏和底部安全区；列表页面底部预留导航高度，固定控件不得遮挡最后一项内容。

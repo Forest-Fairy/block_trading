@@ -114,6 +114,31 @@ button {
   font-weight: 700;
 }
 
+.status-campus-button {
+  display: inline-flex;
+  height: 24px;
+  align-items: center;
+  gap: 3px;
+  border: 1px solid rgba(29, 118, 87, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 0 6px;
+  color: var(--primary);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.status-campus-button[data-active="true"] {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: white;
+}
+
+.status-campus-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .phone-content {
   min-height: 0;
   flex: 1;
@@ -176,7 +201,9 @@ button {
   color: var(--muted-foreground);
   font-size: 10px;
   font-weight: 600;
-  transition: background 160ms ease, color 160ms ease;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
 }
 
 .bottom-nav-item[data-active="true"] {
@@ -217,6 +244,23 @@ button {
 
 .hide-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+.recommend-toast {
+  pointer-events: none;
+  position: fixed;
+  z-index: 50;
+  bottom: 96px;
+  left: 50%;
+  width: min(calc(100% - 32px), 398px);
+  transform: translateX(-50%);
+  border-radius: var(--radius-lg);
+  background: var(--foreground);
+  color: white;
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 12px;
+  box-shadow: 0 8px 24px rgba(23, 53, 38, 0.2);
 }
 
 @media (max-width: 480px) {
