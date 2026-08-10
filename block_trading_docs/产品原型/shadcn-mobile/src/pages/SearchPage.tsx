@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ChevronRight, Plus, Search, Sparkles } from "lucide-react"
+import { ChevronRight, Search, Sparkles } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -9,16 +9,21 @@ import {
   isActivityVisible,
   participantSummary,
   products,
+  type ViewerMode,
 } from "@/prototype/data"
 
 export function SearchPage({
   onBack,
-  onAddToCart,
+  onOpenPostDetail,
+  onOpenProductDetail,
   campusMode,
+  viewerMode,
 }: {
   onBack: () => void
-  onAddToCart: () => void
+  onOpenPostDetail: (activityId: string) => void
+  onOpenProductDetail: (productId: string) => void
   campusMode: boolean
+  viewerMode: ViewerMode
 }) {
   const [query, setQuery] = useState("")
   const [submitted, setSubmitted] = useState(false)
@@ -38,13 +43,14 @@ export function SearchPage({
 
   const normalizedQuery = query.trim().toLowerCase()
   const activityResults = activities.filter((activity) => {
-    if (!isActivityVisible(activity, campusMode)) return false
+    if (!isActivityVisible(activity, campusMode, viewerMode)) return false
     if (!submitted || !normalizedQuery) return true
     return `${activity.title}${activity.detail}`
       .toLowerCase()
       .includes(normalizedQuery)
   })
   const productResults = products.filter((product) => {
+    if (viewerMode === "guest") return false
     if (!submitted || !normalizedQuery) return true
     return `${product.name}${product.description}`
       .toLowerCase()
@@ -194,7 +200,19 @@ export function SearchPage({
           {scope !== "商城" ? (
             <div className="space-y-3">
               {activityResults.map((activity) => (
-                <Card key={activity.id} className="overflow-hidden">
+                <Card
+                  key={activity.id}
+                  className="overflow-hidden transition hover:border-primary/40"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onOpenPostDetail(activity.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault()
+                      onOpenPostDetail(activity.id)
+                    }
+                  }}
+                >
                   <div className="flex gap-3 p-3">
                     <div className="size-[76px] shrink-0 overflow-hidden rounded-lg bg-muted">
                       <img
@@ -234,7 +252,19 @@ export function SearchPage({
               className={`${scope !== "商城" && activityResults.length ? "mt-5" : ""} space-y-3`}
             >
               {productResults.map((product) => (
-                <Card key={product.id} className="overflow-hidden">
+                <Card
+                  key={product.id}
+                  className="overflow-hidden"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onOpenProductDetail(product.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault()
+                      onOpenProductDetail(product.id)
+                    }
+                  }}
+                >
                   <div className="flex gap-3 p-3">
                     <div className="size-[76px] shrink-0 overflow-hidden rounded-lg bg-muted">
                       <img
@@ -262,16 +292,14 @@ export function SearchPage({
                         </span>
                         <Button
                           type="button"
-                          size="icon-sm"
-                          className="rounded-full"
-                          aria-label={`加入购物车：${product.name}`}
-                          onClick={() => {
-                            onAddToCart()
-                            setToast("已加入购物车")
-                            window.setTimeout(() => setToast(""), 2200)
+                          size="sm"
+                          aria-label={`查看${product.name}详情`}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            onOpenProductDetail(product.id)
                           }}
                         >
-                          <Plus size={15} />
+                          去看看 <ChevronRight size={14} />
                         </Button>
                       </div>
                     </div>

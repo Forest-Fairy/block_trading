@@ -1,10 +1,9 @@
-import { type ReactNode } from "react"
+import { type PointerEvent, type ReactNode } from "react"
 import {
   ChevronRight,
   GraduationCap,
   Heart,
   Info,
-  Plus,
   ShieldCheck,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -17,6 +16,7 @@ import {
   participantSummary,
   products,
   navItems,
+  type ViewerMode,
 } from "@/prototype/data"
 
 export function StatusBar({
@@ -63,15 +63,24 @@ export function BottomNav({
   onChange,
   unreadCount,
   campusMode,
+  viewerMode = "member",
 }: {
   current: PageKey
   onChange: (page: PageKey) => void
   unreadCount: number
   campusMode: boolean
+  viewerMode?: ViewerMode
 }) {
+  const visibleItems =
+    viewerMode === "guest"
+      ? navItems.filter(
+          ({ key }) =>
+            key === "recommend" || key === "community" || key === "profile"
+        )
+      : navItems
   return (
     <nav className="bottom-nav safe-bottom" aria-label="主导航">
-      {navItems.map(({ key, label, icon: Icon }) => (
+      {visibleItems.map(({ key, label, icon: Icon }) => (
         <button
           key={key}
           type="button"
@@ -99,10 +108,14 @@ export function IconButton({
   label,
   children,
   onClick,
+  onPointerDown,
+  className,
 }: {
   label: string
   children: ReactNode
   onClick?: () => void
+  onPointerDown?: (event: PointerEvent<HTMLButtonElement>) => void
+  className?: string
 }) {
   return (
     <Button
@@ -111,6 +124,8 @@ export function IconButton({
       size="icon"
       aria-label={label}
       onClick={onClick}
+      onPointerDown={onPointerDown}
+      className={className}
     >
       {children}
     </Button>
@@ -120,21 +135,26 @@ export function IconButton({
 export function PageHeader({
   eyebrow,
   title,
+  leading,
   action,
   onAction,
 }: {
   eyebrow?: string
-  title: string
+  title: ReactNode
+  leading?: ReactNode
   action?: ReactNode
   onAction?: () => void
 }) {
   return (
     <header className="mb-5 flex items-end justify-between gap-3">
-      <div>
-        {eyebrow ? (
-          <p className="mb-1 text-xs font-semibold text-primary">{eyebrow}</p>
-        ) : null}
-        <h1 className="page-title">{title}</h1>
+      <div className="flex min-w-0 items-end gap-2">
+        {leading ? <span className="shrink-0 self-end">{leading}</span> : null}
+        <div className="min-w-0">
+          {eyebrow ? (
+            <p className="mb-1 text-xs font-semibold text-primary">{eyebrow}</p>
+          ) : null}
+          <h1 className="page-title">{title}</h1>
+        </div>
       </div>
       {action ? (
         <span onClick={onAction} className="shrink-0">
@@ -151,12 +171,16 @@ export function CommunityCard({
   joined = false,
   verified = true,
   onAction,
+  onOpenDetail,
+  viewerMode = "member",
 }: {
   activity: (typeof activities)[number]
   compact?: boolean
   joined?: boolean
   verified?: boolean
   onAction?: () => void
+  onOpenDetail?: () => void
+  viewerMode?: ViewerMode
 }) {
   const toneClass = {
     green: "bg-secondary text-primary",
@@ -170,7 +194,12 @@ export function CommunityCard({
         compact ? "overflow-hidden border-0 shadow-none" : "overflow-hidden"
       }
     >
-      <div className="flex gap-3 p-3">
+      <button
+        type="button"
+        className="flex w-full gap-3 p-3 text-left"
+        onClick={onOpenDetail}
+        aria-label={`查看${activity.title}详情`}
+      >
         <div className="h-[92px] w-[88px] shrink-0 overflow-hidden rounded-lg bg-muted">
           <img className="image-cover" src={activity.image} alt="" />
         </div>
@@ -193,15 +222,37 @@ export function CommunityCard({
           <p className="mt-1 truncate text-xs text-muted-foreground">
             {activity.detail}
           </p>
-          <div className="mt-3 flex items-center gap-2">
-            <Progress value={activity.progress} className="h-1.5 flex-1" />
-            <span className="text-[11px] font-semibold whitespace-nowrap text-[var(--qh-coral)]">
-              {participantSummary(activity)}
-            </span>
-          </div>
+          {viewerMode === "guest" ? (
+            <p className="mt-3 text-[11px] text-muted-foreground">
+              描述：{(activity.description ?? activity.detail).slice(0, 30)}
+            </p>
+          ) : (
+            <div className="mt-3 flex items-center gap-2">
+              <Progress value={activity.progress} className="h-1.5 flex-1" />
+              <span className="text-[11px] font-semibold whitespace-nowrap text-[var(--qh-coral)]">
+                {participantSummary(activity)}
+              </span>
+            </div>
+          )}
         </div>
-      </div>
-      {!compact ? (
+      </button>
+      {!compact && viewerMode === "guest" ? (
+        <div className="flex items-center justify-between border-t border-border/60 px-3 py-2.5 text-xs text-muted-foreground">
+          <span>
+            留言 {activity.commentCount ?? 0} · 评论{" "}
+            {(activity.commentCount ?? 0) + (activity.replyCount ?? 0)}
+          </span>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-primary"
+            onClick={onOpenDetail}
+          >
+            查看详情 <ChevronRight size={14} />
+          </Button>
+        </div>
+      ) : !compact ? (
         <div className="flex items-center justify-between border-t border-border/60 px-3 py-2.5 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             {verified ? <ShieldCheck size={13} /> : <Info size={13} />}
@@ -218,7 +269,9 @@ export function CommunityCard({
               ? "查看进度"
               : activity.type === "拼车"
                 ? "申请加入"
-                : "去参与"}
+                : activity.type === "近邻互助"
+                  ? "响应求助"
+                  : "去参与"}
             <ChevronRight size={14} />
           </Button>
         </div>
@@ -229,14 +282,19 @@ export function CommunityCard({
 
 export function ProductCard({
   product,
-  onAdd,
+  onOpenDetail,
 }: {
   product: (typeof products)[number]
-  onAdd: () => void
+  onOpenDetail: () => void
 }) {
   return (
     <Card className="overflow-hidden border-0 shadow-[0_2px_10px_rgba(28,53,38,0.08)]">
-      <div className="relative aspect-square overflow-hidden bg-muted">
+      <button
+        type="button"
+        className="relative block aspect-square w-full overflow-hidden bg-muted text-left"
+        onClick={onOpenDetail}
+        aria-label={`查看${product.name}详情`}
+      >
         <img className="image-cover" src={product.image} alt={product.name} />
         <Badge
           className="absolute top-2 left-2 border-0 bg-white/90 text-[10px] text-primary"
@@ -253,7 +311,7 @@ export function ProductCard({
         >
           <Heart size={15} />
         </Button>
-      </div>
+      </button>
       <CardContent className="p-3">
         <h3 className="truncate text-sm font-bold">{product.name}</h3>
         <p className="mt-1 truncate text-[11px] text-muted-foreground">
@@ -263,14 +321,8 @@ export function ProductCard({
           <span className="text-base font-extrabold text-[var(--qh-coral)]">
             ¥ {product.price}
           </span>
-          <Button
-            type="button"
-            size="icon-sm"
-            className="rounded-full"
-            onClick={onAdd}
-            aria-label={`加入购物车：${product.name}`}
-          >
-            <Plus size={16} />
+          <Button type="button" size="sm" onClick={onOpenDetail}>
+            去看看 <ChevronRight size={14} />
           </Button>
         </div>
       </CardContent>

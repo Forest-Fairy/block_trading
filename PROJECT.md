@@ -21,3 +21,6 @@
 ## 原型入口
 - 移动端交互原型: `block_trading_docs/产品原型/shadcn-mobile/`
 - 原型技术: React、TypeScript、Tailwind CSS、shadcn/ui
+
+## 前端内容验收
+- 前端内容验收只需打开目标页面、模拟关键点击，并确认浏览器控制台没有报错；不要求截图验证。

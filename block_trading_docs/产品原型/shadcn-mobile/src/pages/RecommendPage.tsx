@@ -1,14 +1,11 @@
 import { useEffect, useRef, useState } from "react"
 import {
-  Bell,
   CheckCheck,
   ChevronRight,
   Clock3,
-  Heart,
   MapPin,
   MoreHorizontal,
   PackageCheck,
-  Plus,
   QrCode,
   RefreshCw,
   Share2,
@@ -48,21 +45,24 @@ import {
   orderUpdates,
   products,
   type RecommendationItem,
+  type ViewerMode,
 } from "@/prototype/data"
 import { IconButton } from "@/components/prototype-shell"
 
 export function RecommendPage({
   onOpenMessages,
   onOpenSearch,
-  onAddToCart,
-  unreadCount,
+  onOpenPostDetail,
+  onOpenProductDetail,
   campusMode,
+  viewerMode,
 }: {
   onOpenMessages: () => void
   onOpenSearch: () => void
-  onAddToCart: () => void
-  unreadCount: number
+  onOpenPostDetail: (activityId: string) => void
+  onOpenProductDetail: (productId: string) => void
   campusMode: boolean
+  viewerMode: ViewerMode
 }) {
   const [filter, setFilter] = useState("关注")
   const [scanOpen, setScanOpen] = useState(false)
@@ -72,7 +72,6 @@ export function RecommendPage({
   const [recommendFilters, setRecommendFilters] = useState<
     Record<string, string>
   >({})
-  const [liked, setLiked] = useState(false)
   const [city, setCity] = useState("杭州")
   const [cityOpen, setCityOpen] = useState(false)
   const [actionItem, setActionItem] = useState<string | null>(null)
@@ -82,6 +81,7 @@ export function RecommendPage({
   const [refreshing, setRefreshing] = useState(false)
   const [showMore, setShowMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [heroCollapsed, setHeroCollapsed] = useState(false)
   const [toast, setToast] = useState("")
   const recommendLoadSentinelRef = useRef<HTMLDivElement>(null)
   const recommendLoadTimerRef = useRef<number | null>(null)
@@ -139,6 +139,20 @@ export function RecommendPage({
         orderViewport.style.scrollSnapType = ""
       }
     }
+  }, [])
+
+  useEffect(() => {
+    const phoneContent = document.querySelector<HTMLElement>(".phone-content")
+    if (!phoneContent) return
+
+    const collapseHeroAfterScroll = () => {
+      if (phoneContent.scrollTop > 180) setHeroCollapsed(true)
+    }
+
+    phoneContent.addEventListener("scroll", collapseHeroAfterScroll, {
+      passive: true,
+    })
+    return () => phoneContent.removeEventListener("scroll", collapseHeroAfterScroll)
   }, [])
 
   // 扫描面板负责完整相机生命周期，关闭后立即释放摄像头占用。
@@ -224,6 +238,12 @@ export function RecommendPage({
       reason: "周末出发 · 距你 18 km",
     },
     {
+      id: "racket-help",
+      kind: "community",
+      activity: activities[6],
+      reason: "临时求助 · 距你 1.6 km",
+    },
+    {
       id: "backpack",
       kind: "product",
       product: products[2],
@@ -234,14 +254,17 @@ export function RecommendPage({
   const filteredItems = feedItems
     .filter((item) => {
       if (hiddenIds.includes(item.id)) return false
+      if (viewerMode === "guest" && item.kind !== "community") return false
       if (
         item.kind === "community" &&
-        !isActivityVisible(item.activity, campusMode)
+        !isActivityVisible(item.activity, campusMode, viewerMode)
       ) {
         return false
       }
       if (filter === "商城") return item.kind === "product"
-      if (["拼单", "拼车", "线下组队", "线上开黑"].includes(filter)) {
+      if (
+        ["拼单", "拼车", "线下组队", "线上开黑", "近邻互助"].includes(filter)
+      ) {
         return item.kind === "community" && item.activity.type === filter
       }
       return true
@@ -253,6 +276,7 @@ export function RecommendPage({
         拼车: 1,
         线下组队: 2,
         线上开黑: 3,
+        近邻互助: 4,
       }
       const leftRank =
         left.kind === "community" ? priority[left.activity.type] : 10
@@ -290,6 +314,11 @@ export function RecommendPage({
       title: "线上开黑",
       description: "游戏组队和线上活动，随时加入",
       sort: "开始时间优先",
+    },
+    近邻互助: {
+      title: "近邻互助",
+      description: "附近临时需要，按响应时限和距离优先",
+      sort: "响应时限优先",
     },
     商城: {
       title: "趣汇自营精选",
@@ -347,7 +376,7 @@ export function RecommendPage({
       }
       recommendLoadPendingRef.current = false
     }
-  }, [campusMode, filter, filteredItemCount, showMore])
+  }, [campusMode, filter, filteredItemCount, showMore, viewerMode])
 
   const showToast = (message: string) => {
     setToast(message)
@@ -406,21 +435,6 @@ export function RecommendPage({
           <IconButton label="搜索" onClick={onOpenSearch}>
             <Search size={18} />
           </IconButton>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="relative"
-            aria-label={`查看消息，${unreadCount} 条未读`}
-            onClick={onOpenMessages}
-          >
-            <Bell size={18} />
-            {unreadCount > 0 ? (
-              <span className="unread-dot">
-                {unreadCount > 99 ? "99+" : unreadCount}
-              </span>
-            ) : null}
-          </Button>
         </div>
       </div>
 
@@ -495,82 +509,109 @@ export function RecommendPage({
         </CardContent>
       </Card>
 
-      <div className="hide-scrollbar mb-5 flex gap-2 overflow-x-auto pb-0.5">
-        {["关注", "拼单", "拼车", "线下组队", "线上开黑", "商城"].map(
-          (item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => {
-                setFilter(item)
-                setRecommendFilters({})
-                setShowMore(false)
-                setLoadingMore(false)
-                recommendLoadPendingRef.current = false
-                showToast(`已切换到${item}推荐`)
-              }}
-              className={`min-h-9 shrink-0 rounded-full border px-4 py-1.5 text-xs font-semibold transition ${filter === item ? "border-primary bg-primary text-white" : "border-border bg-white text-muted-foreground hover:border-primary/40"}`}
-            >
-              {item}
-            </button>
-          )
-        )}
-      </div>
-
-      {!hiddenIds.includes("hero") ? (
-        <Card className="mb-5 overflow-hidden border-0 bg-[#e5efe8] shadow-none">
-          <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
-            <div>
-              <p className="text-sm font-extrabold text-primary">今日首推</p>
-              <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                <MapPin size={12} /> 距离你 2.8 km
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-xs"
-              aria-label="隐藏今日首推"
-              onClick={() => hideItem("hero", "已隐藏这条首推")}
-            >
-              <MoreHorizontal size={16} />
-            </Button>
-          </div>
-          <div className="grid grid-cols-[0.88fr_1.12fr]">
-            <div className="min-h-[214px] overflow-hidden">
-              <img
-                className="image-cover"
-                src={imageUrls.hike}
-                alt="径山徒步活动"
-              />
-            </div>
-            <div className="flex flex-col justify-center p-4">
-              <h2 className="text-[18px] leading-tight font-extrabold">
-                周日径山轻徒步
-              </h2>
-              <p className="mt-1 text-xs font-semibold text-primary">
-                还差 2 位同行者
-              </p>
-              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                08:30 集合 · 人均约 ¥68
-                <br />
-                发起人：林同学 · 已认证
-              </p>
+      {!hiddenIds.includes("hero") && viewerMode !== "guest" ? (
+        heroCollapsed ? (
+          <button
+            type="button"
+            className="sticky top-0 z-10 mb-3 flex w-full items-center justify-between rounded-lg border border-[#cbdccd] bg-[#e5efe8]/95 px-3 py-2 text-left text-xs font-semibold text-primary shadow-sm backdrop-blur"
+            onClick={() => setHeroCollapsed(false)}
+          >
+            今日首推已收起 <ChevronRight size={15} />
+          </button>
+        ) : (
+          <Card className="mb-4 overflow-hidden border-0 bg-[#e5efe8] shadow-none">
+            <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
+              <div>
+                <p className="text-sm font-extrabold text-primary">今日首推</p>
+                <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <MapPin size={12} /> 距离你 2.8 km
+                </p>
+              </div>
               <Button
                 type="button"
-                className="mt-3 h-9 justify-between px-3 text-xs"
-                onClick={() => {
-                  setLiked(true)
-                  showToast("已加入行程，去社区查看进度")
-                }}
+                variant="ghost"
+                size="icon-xs"
+                aria-label="隐藏今日首推"
+                onClick={() => hideItem("hero", "已隐藏这条首推")}
               >
-                {liked ? "查看进度" : "去参与"}
-                <Heart size={15} fill={liked ? "currentColor" : "none"} />
+                <MoreHorizontal size={16} />
               </Button>
             </div>
-          </div>
-        </Card>
+            <div
+              className="grid grid-cols-[0.88fr_1.12fr]"
+              role="button"
+              tabIndex={0}
+              onClick={() => onOpenPostDetail("travel")}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault()
+                  onOpenPostDetail("travel")
+                }
+              }}
+            >
+              <div className="min-h-[214px] overflow-hidden">
+                <img
+                  className="image-cover"
+                  src={imageUrls.hike}
+                  alt="径山徒步活动"
+                />
+              </div>
+              <div className="flex flex-col justify-center p-4">
+                <h2 className="text-[18px] leading-tight font-extrabold">
+                  周日径山轻徒步
+                </h2>
+                <p className="mt-1 text-xs font-semibold text-primary">
+                  还差 2 位同行者
+                </p>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  08:30 集合 · 人均约 ¥68
+                  <br />
+                  发起人：林同学 · 已认证
+                </p>
+                <Button
+                  type="button"
+                  className="mt-3 h-9 justify-between px-3 text-xs"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    showToast("参与操作将在后续流程接入")
+                  }}
+                >
+                  去参与
+                  <ChevronRight size={15} />
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )
       ) : null}
+
+      <div className="hide-scrollbar mb-5 flex gap-2 overflow-x-auto pb-0.5">
+        {[
+          "关注",
+          "拼单",
+          "拼车",
+          "线下组队",
+          "线上开黑",
+          "近邻互助",
+          "商城",
+        ].map((item) => (
+          <button
+            key={item}
+            type="button"
+            onClick={() => {
+              setFilter(item)
+              setRecommendFilters({})
+              setShowMore(false)
+              setLoadingMore(false)
+              recommendLoadPendingRef.current = false
+              showToast(`已切换到${item}推荐`)
+            }}
+            className={`min-h-9 shrink-0 rounded-full border px-4 py-1.5 text-xs font-semibold transition ${filter === item ? "border-primary bg-primary text-white" : "border-border bg-white text-muted-foreground hover:border-primary/40"}`}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
 
       <div className="mb-3 flex items-center justify-between">
         <div>
@@ -614,7 +655,18 @@ export function RecommendPage({
               }[item.activity.tone]
               return (
                 <Card key={item.id} className="overflow-hidden">
-                  <div className="flex gap-3 p-3">
+                  <div
+                    className="flex gap-3 p-3"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onOpenPostDetail(item.activity.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault()
+                        onOpenPostDetail(item.activity.id)
+                      }
+                    }}
+                  >
                     <div className="h-[92px] w-[88px] shrink-0 overflow-hidden rounded-lg bg-muted">
                       <img
                         className="image-cover"
@@ -639,7 +691,10 @@ export function RecommendPage({
                             variant="ghost"
                             size="icon-xs"
                             aria-label={`管理${item.activity.title}`}
-                            onClick={() => setActionItem(item.id)}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setActionItem(item.id)
+                            }}
                           >
                             <MoreHorizontal size={16} />
                           </Button>
@@ -651,37 +706,75 @@ export function RecommendPage({
                       <p className="mt-1 truncate text-xs text-muted-foreground">
                         {item.activity.detail}
                       </p>
-                      <div className="mt-3 flex items-center gap-2">
-                        <Progress
-                          value={item.activity.progress}
-                          className="h-1.5 flex-1"
-                        />
-                        <span className="text-[11px] font-semibold whitespace-nowrap text-[var(--qh-coral)]">
-                          {participantSummary(item.activity)}
-                        </span>
-                      </div>
+                      {viewerMode === "guest" ? (
+                        <p className="mt-3 truncate text-[11px] text-muted-foreground">
+                          描述：
+                          {(
+                            item.activity.description ?? item.activity.detail
+                          ).slice(0, 30)}
+                        </p>
+                      ) : (
+                        <div className="mt-3 flex items-center gap-2">
+                          <Progress
+                            value={item.activity.progress}
+                            className="h-1.5 flex-1"
+                          />
+                          <span className="text-[11px] font-semibold whitespace-nowrap text-[var(--qh-coral)]">
+                            {participantSummary(item.activity)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center justify-between border-t border-border/60 px-3 py-2.5 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Clock3 size={13} /> 距离截止 6 小时
-                    </span>
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="h-auto p-0 text-primary"
-                      onClick={() => showToast("已打开社区详情")}
-                    >
-                      去参与 <ChevronRight size={14} />
-                    </Button>
-                  </div>
+                  {viewerMode === "guest" ? (
+                    <div className="flex items-center justify-between border-t border-border/60 px-3 py-2.5 text-xs text-muted-foreground">
+                      <span>
+                        留言 {item.activity.commentCount ?? 0} · 评论{" "}
+                        {(item.activity.commentCount ?? 0) +
+                          (item.activity.replyCount ?? 0)}
+                      </span>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-primary"
+                        onClick={() => onOpenPostDetail(item.activity.id)}
+                      >
+                        查看详情 <ChevronRight size={14} />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between border-t border-border/60 px-3 py-2.5 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Clock3 size={13} /> 距离截止 6 小时
+                      </span>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 text-primary"
+                        onClick={() => showToast("参与操作将在后续流程接入")}
+                      >
+                        去参与 <ChevronRight size={14} />
+                      </Button>
+                    </div>
+                  )}
                 </Card>
               )
             }
             if (item.kind === "product") {
               return (
                 <Card key={item.id} className="overflow-hidden">
-                  <div className="flex gap-3 p-3">
+                  <div
+                    className="flex gap-3 p-3"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onOpenProductDetail(item.product.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault()
+                        onOpenProductDetail(item.product.id)
+                      }
+                    }}
+                  >
                     <div className="relative size-[92px] shrink-0 overflow-hidden rounded-lg bg-muted">
                       <img
                         className="image-cover"
@@ -702,7 +795,10 @@ export function RecommendPage({
                           variant="ghost"
                           size="icon-xs"
                           aria-label={`管理${item.product.name}`}
-                          onClick={() => setActionItem(item.id)}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setActionItem(item.id)
+                          }}
                         >
                           <MoreHorizontal size={16} />
                         </Button>
@@ -719,15 +815,14 @@ export function RecommendPage({
                         </span>
                         <Button
                           type="button"
-                          size="icon-sm"
-                          className="rounded-full"
-                          onClick={() => {
-                            onAddToCart()
-                            showToast("已加入购物车")
+                          size="sm"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            onOpenProductDetail(item.product.id)
                           }}
-                          aria-label={`加入购物车：${item.product.name}`}
+                          aria-label={`查看${item.product.name}详情`}
                         >
-                          <Plus size={16} />
+                          去看看 <ChevronRight size={14} />
                         </Button>
                       </div>
                     </div>

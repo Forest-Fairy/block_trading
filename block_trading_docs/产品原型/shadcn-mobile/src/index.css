@@ -263,6 +263,38 @@ button {
   box-shadow: 0 8px 24px rgba(23, 53, 38, 0.2);
 }
 
+.profile-summary-marquee {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.profile-summary-marquee-track {
+  display: inline-block;
+  min-width: max-content;
+  padding-right: 28px;
+  animation: profile-summary-marquee 6s ease-in-out infinite alternate;
+}
+
+@keyframes profile-summary-marquee {
+  0%,
+  18% {
+    transform: translateX(0);
+  }
+
+  82%,
+  100% {
+    transform: translateX(var(--profile-scroll-distance));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-summary-marquee-track {
+    animation: none;
+  }
+}
+
 @media (max-width: 480px) {
   .prototype-stage {
     padding: 0;

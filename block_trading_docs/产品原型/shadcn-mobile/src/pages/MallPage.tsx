@@ -28,17 +28,42 @@ import {
   ProductCard,
 } from "@/components/prototype-shell"
 
+type MallFilters = {
+  categories: string[]
+  statuses: string[]
+  minPrice: string
+  maxPrice: string
+  sort: string
+}
+
 export function MallPage({
   cartCount,
-  onAdd,
+  onOpenProductDetail,
 }: {
   cartCount: number
-  onAdd: () => void
+  onOpenProductDetail: (productId: string) => void
 }) {
   const [category, setCategory] = useState("推荐")
   const [mallFilterOpen, setMallFilterOpen] = useState(false)
-  const [mallFilters, setMallFilters] = useState<Record<string, string>>({})
+  const [mallFilters, setMallFilters] = useState<MallFilters>({
+    categories: [],
+    statuses: [],
+    minPrice: "",
+    maxPrice: "",
+    sort: "",
+  })
   const categories = ["推荐", "实物商品", "会员权益", "服务产品"]
+  const toggleMallFilter = (key: "categories" | "statuses", option: string) => {
+    setMallFilters((current) => {
+      const selected = current[key]
+      return {
+        ...current,
+        [key]: selected.includes(option)
+          ? selected.filter((item) => item !== option)
+          : [...selected, option],
+      }
+    })
+  }
   return (
     <div className="page-content">
       <PageHeader
@@ -126,7 +151,11 @@ export function MallPage({
       </div>
       <div className="grid grid-cols-2 gap-3">
         {products.map((product) => (
-          <ProductCard key={product.id} product={product} onAdd={onAdd} />
+          <ProductCard
+            key={product.id}
+            product={product}
+            onOpenDetail={() => onOpenProductDetail(product.id)}
+          />
         ))}
       </div>
       <div className="mt-5 flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
@@ -157,26 +186,20 @@ export function MallPage({
                 商品分类
               </p>
               <div className="grid grid-cols-2 gap-2">
-                {["全部商品", "实物商品", "会员权益", "服务产品"].map(
-                  (option) => (
-                    <Button
-                      key={option}
-                      type="button"
-                      size="sm"
-                      variant={
-                        mallFilters.category === option ? "default" : "outline"
-                      }
-                      onClick={() =>
-                        setMallFilters((current) => ({
-                          ...current,
-                          category: option,
-                        }))
-                      }
-                    >
-                      {option}
-                    </Button>
-                  )
-                )}
+                {["实物商品", "会员权益", "服务产品"].map((option) => (
+                  <label
+                    key={option}
+                    className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold transition ${mallFilters.categories.includes(option) ? "border-primary bg-secondary text-primary" : "border-border bg-white text-foreground"}`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="size-4 accent-primary"
+                      checked={mallFilters.categories.includes(option)}
+                      onChange={() => toggleMallFilter("categories", option)}
+                    />
+                    <span>{option}</span>
+                  </label>
+                ))}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
@@ -234,22 +257,18 @@ export function MallPage({
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {["全新", "二手", "有货", "包邮"].map((option) => (
-                  <Button
+                  <label
                     key={option}
-                    type="button"
-                    size="sm"
-                    variant={
-                      mallFilters.status === option ? "default" : "outline"
-                    }
-                    onClick={() =>
-                      setMallFilters((current) => ({
-                        ...current,
-                        status: option,
-                      }))
-                    }
+                    className={`flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-xs font-semibold transition ${mallFilters.statuses.includes(option) ? "border-primary bg-secondary text-primary" : "border-border bg-white text-foreground"}`}
                   >
-                    {option}
-                  </Button>
+                    <input
+                      type="checkbox"
+                      className="size-4 accent-primary"
+                      checked={mallFilters.statuses.includes(option)}
+                      onChange={() => toggleMallFilter("statuses", option)}
+                    />
+                    <span>{option}</span>
+                  </label>
                 ))}
               </div>
             </div>

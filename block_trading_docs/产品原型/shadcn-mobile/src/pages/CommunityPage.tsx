@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
-  Bell,
   Bike,
   CheckCheck,
   ChevronRight,
   Gamepad2,
-  Plus,
   RefreshCw,
   Search,
   SlidersHorizontal,
@@ -28,6 +26,7 @@ import {
   activities,
   verifiedActivityIds,
   isActivityVisible,
+  type ViewerMode,
 } from "@/prototype/data"
 import {
   IconButton,
@@ -36,15 +35,15 @@ import {
 } from "@/components/prototype-shell"
 
 export function CommunityPage({
-  onOpenMessages,
   onOpenSearch,
-  unreadCount,
+  onOpenPostDetail,
   campusMode,
+  viewerMode,
 }: {
-  onOpenMessages: () => void
   onOpenSearch: () => void
-  unreadCount: number
+  onOpenPostDetail: (activityId: string) => void
   campusMode: boolean
+  viewerMode: ViewerMode
 }) {
   const [communityView, setCommunityView] = useState("发现")
   const [activeType, setActiveType] = useState("全部")
@@ -55,8 +54,9 @@ export function CommunityPage({
   >({})
   const [createOpen, setCreateOpen] = useState(false)
   const [createType, setCreateType] = useState("拼单")
+  const [helpUrgent, setHelpUrgent] = useState(false)
   const [created, setCreated] = useState(false)
-  const [joinedIds, setJoinedIds] = useState<string[]>(["travel"])
+  const [joinedIds] = useState<string[]>(["travel"])
   const [communityPage, setCommunityPage] = useState(1)
   const [communityLoading, setCommunityLoading] = useState(false)
   const [communityToast, setCommunityToast] = useState("")
@@ -72,12 +72,14 @@ export function CommunityPage({
           ? ["目的地距离优先", "人均消费优先", "综合优先"]
           : activeType === "线上开黑"
             ? ["开始时间优先", "时长最短", "时长最长", "综合优先"]
-            : ["综合优先", "距离优先", "截止优先"]
+            : activeType === "近邻互助"
+              ? ["响应时限优先", "距离优先", "报酬优先", "综合优先"]
+              : ["综合优先", "距离优先", "截止优先"]
   const communitySort = communityFilterValues.sort || communitySortOptions[0]
 
   const filteredActivities = useMemo(() => {
     const results = activities.filter((activity) => {
-      if (!isActivityVisible(activity, campusMode)) return false
+      if (!isActivityVisible(activity, campusMode, viewerMode)) return false
       if (communityView === "我参与的" && !joinedIds.includes(activity.id)) {
         return false
       }
@@ -129,6 +131,7 @@ export function CommunityPage({
     communitySort,
     communityView,
     joinedIds,
+    viewerMode,
   ])
 
   const visibleActivities = filteredActivities.slice(0, communityPage * 4)
@@ -197,12 +200,13 @@ export function CommunityPage({
   }
 
   const joinActivity = (id: string) => {
-    if (joinedIds.includes(id)) {
-      showCommunityToast("已打开活动进度")
+    if (viewerMode === "guest") {
+      showCommunityToast("登录后才能参与或响应求助")
       return
     }
-    setJoinedIds((ids) => [...ids, id])
-    showCommunityToast("已加入活动，可在“我参与的”查看")
+    showCommunityToast(
+      joinedIds.includes(id) ? "已打开活动进度" : "参与操作将在后续流程接入"
+    )
   }
 
   const createTypes: Array<{ Icon: typeof UsersRound; label: string }> = [
@@ -210,6 +214,7 @@ export function CommunityPage({
     { Icon: Bike, label: "拼车" },
     { Icon: UsersRound, label: "线下组队" },
     { Icon: Gamepad2, label: "线上开黑" },
+    { Icon: UsersRound, label: "近邻互助" },
   ]
   const hasParticipantRange = createType === "拼车" || createType === "线上开黑"
   const activityLabel = campusMode ? "校园活动" : "社区活动"
@@ -219,31 +224,14 @@ export function CommunityPage({
         eyebrow={campusMode ? "杭州大学 · 同校活动" : "杭州 · 27 个活动可参与"}
         title={campusMode ? "校园" : "社区"}
         action={
-          <div className="flex gap-2">
-            <IconButton label="搜索" onClick={onOpenSearch}>
-              <Search size={18} />
-            </IconButton>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="relative"
-              aria-label={`查看通知，${unreadCount} 条未读`}
-              onClick={onOpenMessages}
-            >
-              <Bell size={18} />
-              {unreadCount > 0 ? (
-                <span className="unread-dot">
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </span>
-              ) : null}
-            </Button>
-          </div>
+          <IconButton label="搜索" onClick={onOpenSearch}>
+            <Search size={18} />
+          </IconButton>
         }
       />
 
-      <div className="mb-4 flex gap-2">
-        <div className="grid flex-1 grid-cols-2 rounded-lg bg-muted p-1">
+      <div className="mb-4">
+        <div className="grid grid-cols-2 rounded-lg bg-muted p-1">
           {["发现", "我参与的"].map((view) => (
             <button
               key={view}
@@ -258,17 +246,18 @@ export function CommunityPage({
             </button>
           ))}
         </div>
-        <IconButton
-          label={`发布${activityLabel}`}
-          onClick={() => setCreateOpen(true)}
-        >
-          <Plus size={18} />
-        </IconButton>
       </div>
 
       {created ? (
         <div className="mb-4 flex items-center gap-2 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-primary">
           <CheckCheck size={15} /> 草稿已保存，可在“我的”中继续编辑
+        </div>
+      ) : null}
+
+      {viewerMode === "guest" ? (
+        <div className="mb-4 rounded-lg bg-muted p-3 text-xs leading-5 text-muted-foreground">
+          游客模式仅展示 5 km
+          内公开的近邻互助，帖子用户信息和留言内容需要登录后查看。
         </div>
       ) : null}
 
@@ -286,6 +275,7 @@ export function CommunityPage({
           <TabsTrigger value="拼车">拼车</TabsTrigger>
           <TabsTrigger value="线下组队">线下组队</TabsTrigger>
           <TabsTrigger value="线上开黑">线上开黑</TabsTrigger>
+          <TabsTrigger value="近邻互助">近邻互助</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -333,6 +323,8 @@ export function CommunityPage({
               verified={verifiedActivityIds.has(activity.id)}
               joined={joinedIds.includes(activity.id)}
               onAction={() => joinActivity(activity.id)}
+              onOpenDetail={() => onOpenPostDetail(activity.id)}
+              viewerMode={viewerMode}
             />
           ))}
         </div>
@@ -357,13 +349,15 @@ export function CommunityPage({
               >
                 清除筛选
               </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => setCreateOpen(true)}
-              >
-                发起活动
-              </Button>
+              {viewerMode !== "guest" ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  发起活动
+                </Button>
+              ) : null}
             </div>
           </CardContent>
         </Card>
@@ -387,7 +381,7 @@ export function CommunityPage({
         </div>
       ) : visibleActivities.length ? (
         <p className="py-5 text-center text-xs text-muted-foreground">
-          已看完当前结果
+          暂无更多内容
         </p>
       ) : null}
 
@@ -509,6 +503,25 @@ export function CommunityPage({
                 />
               </>
             ) : null}
+            {activeType === "近邻互助" ? (
+              <>
+                <Input placeholder="报酬，例如：20 元或可协商" />
+                <div className="grid grid-cols-2 gap-2">
+                  <Input placeholder="需求时间或开始时间" />
+                  <Input placeholder="最晚响应时间" />
+                </div>
+                <Button
+                  type="button"
+                  variant={
+                    activeFilters.includes("加急") ? "default" : "outline"
+                  }
+                  size="sm"
+                  onClick={() => toggleCommunityFilter("加急")}
+                >
+                  {activeFilters.includes("加急") ? "已设为加急" : "设为加急"}
+                </Button>
+              </>
+            ) : null}
             {activeType === "全部" ? (
               <div className="grid grid-cols-3 gap-2">
                 {["5km 内", "今天", "仅看已认证"].map((option) => (
@@ -584,6 +597,22 @@ export function CommunityPage({
               <div className="grid grid-cols-2 gap-2">
                 <Input placeholder="最少人数，例如：2" type="number" />
                 <Input placeholder="最多人数，例如：4" type="number" />
+              </div>
+            ) : createType === "近邻互助" ? (
+              <div className="space-y-2">
+                <Input placeholder="描述需求，例如：明天下午借一副羽毛球拍" />
+                <div className="grid grid-cols-2 gap-2">
+                  <Input placeholder="即时 / 时段" />
+                  <Input placeholder="最晚响应时间" />
+                </div>
+                <Button
+                  type="button"
+                  variant={helpUrgent ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setHelpUrgent((value) => !value)}
+                >
+                  {helpUrgent ? "已标记加急" : "标记为加急"}
+                </Button>
               </div>
             ) : (
               <Input placeholder="目标人数，例如：5" type="number" />
