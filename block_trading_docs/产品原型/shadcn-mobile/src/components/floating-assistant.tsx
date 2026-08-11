@@ -52,7 +52,9 @@ export function FloatingAssistant({
   const [dragPosition, setDragPosition] = useState<DragPosition | null>(null)
   const [dockPosition, setDockPosition] = useState<DragPosition | null>(null)
   const [docking, setDocking] = useState(false)
-  const [dockStage, setDockStage] = useState<"first" | "second" | null>(null)
+  const [dockStage, setDockStage] = useState<
+    "approach" | "center" | "embed" | null
+  >(null)
   const [popping, setPopping] = useState(false)
   const [menuBottomBoundary, setMenuBottomBoundary] = useState(650)
   const pointerStart = useRef<{
@@ -202,23 +204,31 @@ export function FloatingAssistant({
         left: Math.max(0, Math.min(targetRect.left - shellRect.left + targetRect.width / 2 - ballRadius, shellRect.width - ballSize)),
         top: Math.max(52, targetRect.top - shellRect.top + targetRect.height / 2 - ballRadius),
       }
+      const halfwayPosition = {
+        left: (candidate.left + alignedPosition.left) / 2,
+        top: (candidate.top + alignedPosition.top) / 2,
+      }
       dockIdleTimer.current = null
-      setDockPosition(alignedPosition)
       setDragging(false)
       draggingRef.current = false
       setDocking(true)
-      setDockStage("first")
+      setDockStage("approach")
+      setDockPosition(halfwayPosition)
       dockStageTimer.current = window.setTimeout(() => {
-        dockStageTimer.current = null
-        setDockStage("second")
-      }, 1500)
+        setDockStage("center")
+        setDockPosition(alignedPosition)
+        dockStageTimer.current = window.setTimeout(() => {
+          dockStageTimer.current = null
+          setDockStage("embed")
+        }, 800)
+      }, 800)
       dockTimer.current = window.setTimeout(() => {
         dockTimer.current = null
         setDocking(false)
         setDockStage(null)
         setMenuOpen(false)
         onDockChange(true)
-      }, 3000)
+      }, 2400)
     }, 500)
     return true
   }, [clearDockTimer, onDockChange])
@@ -229,12 +239,32 @@ export function FloatingAssistant({
     clientY: number,
     pointerId: number
   ) => {
-    if (pointerStart.current) return
+    if (idleTimer.current) window.clearTimeout(idleTimer.current)
+    idleTimer.current = null
     pointerStart.current = { button, x: clientX, y: clientY, pointerId }
     draggingRef.current = false
     ignoreClick.current = false
     setDragging(false)
   }
+
+  const cancelDrag = useCallback((pointerId: number) => {
+    const start = pointerStart.current
+    if (!start || start.pointerId !== pointerId) return
+    const currentPosition = dragPosition
+    const shell = start.button.closest(".phone-shell")
+    pointerStart.current = null
+    if (currentPosition && shell) {
+      setTop(currentPosition.top)
+      setSide(
+        currentPosition.left + ballRadius < shell.getBoundingClientRect().width / 2
+          ? "left"
+          : "right"
+      )
+    }
+    draggingRef.current = false
+    setDragging(false)
+    setDragPosition(null)
+  }, [dragPosition])
 
   useEffect(() => {
     if (!releasePointer || docked) return
@@ -269,6 +299,8 @@ export function FloatingAssistant({
   const moveDrag = useCallback((clientX: number, clientY: number, pointerId: number) => {
     const start = pointerStart.current
     if (!start || start.pointerId !== pointerId) return
+    if (idleTimer.current) window.clearTimeout(idleTimer.current)
+    idleTimer.current = null
     const nextPosition = getDragPosition(start.button, clientX, clientY)
     if (docking) {
       clearDockTimer()
@@ -349,13 +381,17 @@ export function FloatingAssistant({
       moveDrag(event.clientX, event.clientY, event.pointerId)
     const onPointerUp = (event: globalThis.PointerEvent) =>
       finishDrag(event.clientX, event.clientY, event.pointerId)
+    const onPointerCancel = (event: globalThis.PointerEvent) =>
+      cancelDrag(event.pointerId)
     window.addEventListener("pointermove", onPointerMove)
     window.addEventListener("pointerup", onPointerUp)
+    window.addEventListener("pointercancel", onPointerCancel)
     return () => {
       window.removeEventListener("pointermove", onPointerMove)
       window.removeEventListener("pointerup", onPointerUp)
+      window.removeEventListener("pointercancel", onPointerCancel)
     }
-  }, [finishDrag, moveDrag])
+  }, [cancelDrag, finishDrag, moveDrag])
 
   useEffect(() => {
     if (!docking) return
@@ -365,7 +401,14 @@ export function FloatingAssistant({
         cancelDockingToRight()
       }
     }
-    const cancelOnUserScroll = () => cancelDockingToRight()
+    const cancelOnUserScroll = (event: Event) => {
+      const target = event.target
+      if (
+        pointerStart.current ||
+        (target instanceof Element && target.closest(".assistant-ball"))
+      ) return
+      cancelDockingToRight()
+    }
     document.addEventListener("pointerdown", cancelOnNavigation, true)
     document.addEventListener("touchmove", cancelOnUserScroll, { passive: true })
     document.addEventListener("wheel", cancelOnUserScroll, { passive: true })
@@ -462,18 +505,30 @@ export function FloatingAssistant({
         className="assistant-ball"
         aria-label={menuOpen ? "关闭悬浮助手菜单" : "打开悬浮助手菜单"}
         aria-expanded={menuOpen}
-        onPointerDown={(event: PointerEvent<HTMLButtonElement>) => {
-          event.currentTarget.setPointerCapture(event.pointerId)
+          onPointerDown={(event: PointerEvent<HTMLButtonElement>) => {
+            event.currentTarget.setPointerCapture(event.pointerId)
           if (collapsed) {
             skipCollapsedClick.current = true
             if (top > menuBottomBoundary - ballSize) {
               setTop(Math.max(52, menuBottomBoundary - ballSize))
             }
             setCollapsed(false)
-          }
-          startDrag(event.currentTarget, event.clientX, event.clientY, event.pointerId)
-        }}
-        onClick={onClick}
+            }
+            startDrag(event.currentTarget, event.clientX, event.clientY, event.pointerId)
+          }}
+          onPointerMove={(event: PointerEvent<HTMLButtonElement>) => {
+            moveDrag(event.clientX, event.clientY, event.pointerId)
+          }}
+          onPointerUp={(event: PointerEvent<HTMLButtonElement>) => {
+            finishDrag(event.clientX, event.clientY, event.pointerId)
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+              event.currentTarget.releasePointerCapture(event.pointerId)
+            }
+          }}
+          onPointerCancel={(event: PointerEvent<HTMLButtonElement>) => {
+            cancelDrag(event.pointerId)
+          }}
+          onClick={onClick}
       >
         {menuOpen ? <X size={24} /> : <Sparkles size={25} />}
         <span>助手</span>

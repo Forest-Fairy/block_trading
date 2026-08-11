@@ -90,8 +90,6 @@ export function RecommendPage({
   const [showMore, setShowMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [heroCollapsed, setHeroCollapsed] = useState(false)
-  const [dockPinned, setDockPinned] = useState(false)
-  const [dockPinPosition, setDockPinPosition] = useState<{ left: number; top: number } | null>(null)
   const [toast, setToast] = useState("")
   const [dockHolding, setDockHolding] = useState(false)
   const recommendLoadSentinelRef = useRef<HTMLDivElement>(null)
@@ -208,23 +206,13 @@ export function RecommendPage({
 
     const collapseHeroAfterScroll = () => {
       if (phoneContent.scrollTop > 180) setHeroCollapsed(true)
-      const pinned = phoneContent.scrollTop > 18
-      setDockPinned(pinned)
-      if (!pinned) return
-      const shellBounds = phoneContent.closest(".phone-shell")?.getBoundingClientRect()
-      if (!shellBounds) return
-      setDockPinPosition({ left: shellBounds.left + 76, top: shellBounds.top + 66 })
     }
 
     collapseHeroAfterScroll()
     phoneContent.addEventListener("scroll", collapseHeroAfterScroll, {
       passive: true,
     })
-    window.addEventListener("resize", collapseHeroAfterScroll)
-    return () => {
-      phoneContent.removeEventListener("scroll", collapseHeroAfterScroll)
-      window.removeEventListener("resize", collapseHeroAfterScroll)
-    }
+    return () => phoneContent.removeEventListener("scroll", collapseHeroAfterScroll)
   }, [])
 
   // 扫描面板负责完整相机生命周期，关闭后立即释放摄像头占用。
@@ -489,10 +477,7 @@ export function RecommendPage({
               data-assistant-dock
               className={`assistant-dock-slot ${
                 assistantDocked ? "is-docked" : ""
-              } ${dockHolding ? "is-holding" : ""} ${
-                dockPinned ? "is-pinned" : ""
-              }`}
-              style={dockPinned && dockPinPosition ? dockPinPosition : undefined}
+              } ${dockHolding ? "is-holding" : ""}`}
               aria-label={
                 assistantDocked
                   ? "按住三秒弹出悬浮助手"
@@ -625,7 +610,7 @@ export function RecommendPage({
             今日首推已收起 <ChevronRight size={15} />
           </button>
         ) : (
-          <Card className="mb-4 h-[160px] gap-0 overflow-hidden border border-border/70 bg-white py-0 shadow-none">
+          <Card className="mb-4 h-[160px] gap-0 rounded-none border-0 bg-transparent py-0 shadow-none">
             <div
               className="relative flex h-full min-h-0"
               role="button"
@@ -638,10 +623,10 @@ export function RecommendPage({
                 }
               }}
             >
-              <div className="h-full w-[38.2%] shrink-0 overflow-hidden rounded-l-xl bg-muted">
+              <div className="h-full w-[38.2%] shrink-0 overflow-hidden bg-muted">
                 <img className="image-cover" src={imageUrls.hike} alt="径山徒步活动" />
               </div>
-              <div className="flex min-w-0 flex-1 flex-col py-3 pr-3 pl-3">
+              <div className="flex min-w-0 flex-1 flex-col rounded-r-xl border-y border-r border-border/70 bg-white py-3 pr-3 pl-3">
                 <div className="flex items-center gap-2 text-xs">
                   <p className="font-extrabold text-primary">今日首推</p>
                   <span className="flex items-center gap-1 text-muted-foreground">
