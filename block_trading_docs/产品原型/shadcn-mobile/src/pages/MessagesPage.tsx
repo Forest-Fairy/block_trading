@@ -20,7 +20,7 @@ import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader, IconButton } from "@/components/prototype-shell"
 
-type MessageView = "inbox" | "system" | "business" | "chat"
+type MessageView = "inbox" | "chat"
 
 const systemNotifications = [
   {
@@ -237,7 +237,7 @@ function ChatView({
         )}
         {isGroup
           ? `${conversation.detail} · 仅活动成员可见`
-          : `${conversation.detail} · 陌生人消息可在偏好设置中关闭`}
+          : `${conversation.detail} · 陌生人消息可在我的 · 隐私设置中关闭`}
       </div>
       <div className="flex-1 space-y-3 pb-4">
         <div className="flex justify-center">
@@ -323,39 +323,6 @@ export function MessagesPage({
         onBack={() => setView("inbox")}
       />
     )
-  if (view === "system" || view === "business") {
-    const title = view === "system" ? "系统通知" : "业务通知"
-    return (
-      <div className="page-content">
-        <PageHeader
-          eyebrow="消息详情"
-          title={title}
-          leading={
-            <IconButton label="返回消息列表" onClick={() => setView("inbox")}>
-              <ArrowLeft size={18} />
-            </IconButton>
-          }
-        />
-        <div className="mb-4 flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">
-            按时间倒序 · 重要状态优先
-          </p>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="text-xs text-primary"
-            onClick={onRead}
-          >
-            <CheckCheck size={14} />
-            全部已读
-          </Button>
-        </div>
-        <NotificationList kind={view} onOpenPostDetail={onOpenPostDetail} />
-      </div>
-    )
-  }
-
   return (
     <div className="page-content">
       <PageHeader
@@ -389,63 +356,87 @@ export function MessagesPage({
           </TabsTrigger>
         </TabsList>
       </Tabs>
-      <div className="space-y-2">
-        <button
-          type="button"
-          onClick={() => {
-            onRead()
-            setView("system")
-          }}
-          className="flex w-full items-center gap-3 rounded-lg border border-border bg-white p-3 text-left transition hover:border-primary/40"
-        >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--qh-blue-soft)] text-[var(--qh-blue)]">
-            <Bell size={18} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <strong className="block text-sm">系统通知</strong>
-            <span className="mt-1 block truncate text-xs text-muted-foreground">
-              账号安全、平台公告和规则更新
-            </span>
-          </span>
-          <Badge
-            className="border-0 bg-[var(--qh-coral)] text-[10px] text-white"
-            variant="outline"
+      {active === "全部" ? (
+        <div className="mb-5 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => setActive("系统")}
+            className="flex w-full items-center gap-3 rounded-lg border border-border bg-white p-3 text-left transition hover:border-primary/40"
           >
-            3
-          </Badge>
-          <ChevronRight size={16} className="text-muted-foreground" />
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            onRead()
-            setView("business")
-          }}
-          className="flex w-full items-center gap-3 rounded-lg border border-border bg-white p-3 text-left transition hover:border-primary/40"
-        >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
-            <Megaphone size={18} />
-          </span>
-          <span className="min-w-0 flex-1">
-            <strong className="block text-sm">业务通知</strong>
-            <span className="mt-1 block truncate text-xs text-muted-foreground">
-              成团、发货、退款和活动状态
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--qh-blue-soft)] text-[var(--qh-blue)]">
+              <Bell size={18} />
             </span>
-          </span>
-          <Badge
-            className="border-0 bg-[var(--qh-coral)] text-[10px] text-white"
-            variant="outline"
+            <span className="min-w-0 flex-1">
+              <strong className="block text-sm">系统通知</strong>
+              <span className="mt-1 block truncate text-xs text-muted-foreground">
+                账号安全、平台公告和规则更新
+              </span>
+            </span>
+            <Badge
+              className="border-0 bg-[var(--qh-coral)] text-[10px] text-white"
+              variant="outline"
+            >
+              3
+            </Badge>
+            <ChevronRight size={16} className="text-muted-foreground" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setActive("业务")}
+            className="flex w-full items-center gap-3 rounded-lg border border-border bg-white p-3 text-left transition hover:border-primary/40"
           >
-            5
-          </Badge>
-          <ChevronRight size={16} className="text-muted-foreground" />
-        </button>
-      </div>
-      <div className="my-5 flex items-center gap-3">
-        <span className="section-title text-base">用户消息</span>
-        <Separator className="flex-1" />
-      </div>
-      <div className="space-y-1">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
+              <Megaphone size={18} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <strong className="block text-sm">业务通知</strong>
+              <span className="mt-1 block truncate text-xs text-muted-foreground">
+                成团、发货、退款和活动状态
+              </span>
+            </span>
+            <Badge
+              className="border-0 bg-[var(--qh-coral)] text-[10px] text-white"
+              variant="outline"
+            >
+              5
+            </Badge>
+            <ChevronRight size={16} className="text-muted-foreground" />
+          </button>
+        </div>
+      ) : null}
+      {active === "系统" ? (
+        <section className="mb-5">
+          <div className="mb-2 flex items-center gap-3">
+            <span className="section-title text-base">系统通知</span>
+            <Separator className="flex-1" />
+          </div>
+          <NotificationList kind="system" onOpenPostDetail={onOpenPostDetail} />
+        </section>
+      ) : null}
+      {active === "业务" ? (
+        <section className="mb-5">
+          <div className="mb-2 flex items-center gap-3">
+            <span className="section-title text-base">业务通知</span>
+            <Separator className="flex-1" />
+          </div>
+          <NotificationList kind="business" onOpenPostDetail={onOpenPostDetail} />
+        </section>
+      ) : null}
+      {active === "全部" || active === "用户" ? (
+        <section className="mb-5">
+          <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3">
+          <span className="section-title text-base">用户消息</span>
+          <Separator className="flex-1" />
+        </div>
+        <Card size="sm" className="border-0 bg-muted shadow-none">
+          <CardContent className="flex items-center gap-3 p-3 text-xs text-muted-foreground">
+            <Info size={16} className="shrink-0 text-primary" />
+            <span>陌生人消息可以在“我的 · 隐私设置”中关闭。</span>
+          </CardContent>
+        </Card>
+          </div>
+      <div className="mt-2 space-y-1">
         {conversations.map((message) => (
           <button
             key={message.id}
@@ -479,12 +470,8 @@ export function MessagesPage({
           </button>
         ))}
       </div>
-      <Card className="mt-5 border-0 bg-muted shadow-none">
-        <CardContent className="flex items-center gap-3 p-3 text-xs text-muted-foreground">
-          <Info size={16} className="shrink-0 text-primary" />
-          <span>陌生人消息可以在“我的 · 隐私设置”中关闭。</span>
-        </CardContent>
-      </Card>
+        </section>
+      ) : null}
     </div>
   )
 }

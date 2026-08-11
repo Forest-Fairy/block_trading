@@ -2,7 +2,7 @@
 
 ## 项目架构
 ### 后端技术栈
- springboot 4, spring-cloud, mybatis-flex
+ springboot 4, spring-cloud, spring-embabel, mybatis-flex
 ### 前端技术栈
  vite, react, uniapp(主要用于小程序兼容)
 ### 中间件

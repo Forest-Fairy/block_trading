@@ -56,6 +56,10 @@ export function RecommendPage({
   onOpenProductDetail,
   campusMode,
   viewerMode,
+  assistantDocked,
+  onReleaseAssistant,
+  onMoveReleasedAssistant,
+  onEndReleasedAssistant,
 }: {
   onOpenMessages: () => void
   onOpenSearch: () => void
@@ -63,6 +67,10 @@ export function RecommendPage({
   onOpenProductDetail: (productId: string) => void
   campusMode: boolean
   viewerMode: ViewerMode
+  assistantDocked: boolean
+  onReleaseAssistant: (pointer: { x: number; y: number; pointerId: number }) => void
+  onMoveReleasedAssistant: (pointer: { x: number; y: number; pointerId: number }) => void
+  onEndReleasedAssistant: (pointer: { x: number; y: number; pointerId: number }) => void
 }) {
   const [filter, setFilter] = useState("关注")
   const [scanOpen, setScanOpen] = useState(false)
@@ -82,7 +90,10 @@ export function RecommendPage({
   const [showMore, setShowMore] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [heroCollapsed, setHeroCollapsed] = useState(false)
+  const [dockPinned, setDockPinned] = useState(false)
+  const [dockPinPosition, setDockPinPosition] = useState<{ left: number; top: number } | null>(null)
   const [toast, setToast] = useState("")
+  const [dockHolding, setDockHolding] = useState(false)
   const recommendLoadSentinelRef = useRef<HTMLDivElement>(null)
   const recommendLoadTimerRef = useRef<number | null>(null)
   const recommendLoadPendingRef = useRef(false)
@@ -91,6 +102,56 @@ export function RecommendPage({
   const orderManualUntilRef = useRef(0)
   const scanVideoRef = useRef<HTMLVideoElement>(null)
   const scanStreamRef = useRef<MediaStream | null>(null)
+  const dockHoldTimerRef = useRef<number | null>(null)
+  const dockPointerRef = useRef({ x: 0, y: 0, pointerId: 0 })
+  const releasedAssistantRef = useRef(false)
+
+  const clearDockHold = () => {
+    if (dockHoldTimerRef.current) window.clearTimeout(dockHoldTimerRef.current)
+    dockHoldTimerRef.current = null
+    setDockHolding(false)
+  }
+
+  useEffect(() => () => clearDockHold(), [])
+
+  const startDockHold = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!assistantDocked || dockHoldTimerRef.current) return
+    dockPointerRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      pointerId: event.pointerId,
+    }
+    event.currentTarget.setPointerCapture(event.pointerId)
+    setDockHolding(true)
+    dockHoldTimerRef.current = window.setTimeout(() => {
+      dockHoldTimerRef.current = null
+      setDockHolding(false)
+      releasedAssistantRef.current = true
+      onReleaseAssistant(dockPointerRef.current)
+    }, 3000)
+  }
+
+  const moveReleasedAssistant = (event: React.PointerEvent<HTMLButtonElement>) => {
+    dockPointerRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      pointerId: event.pointerId,
+    }
+    if (releasedAssistantRef.current) onMoveReleasedAssistant(dockPointerRef.current)
+  }
+
+  const endDockPointer = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!releasedAssistantRef.current) {
+      clearDockHold()
+      return
+    }
+    releasedAssistantRef.current = false
+    onEndReleasedAssistant({
+      x: event.clientX,
+      y: event.clientY,
+      pointerId: event.pointerId,
+    })
+  }
 
   useEffect(() => {
     const orderViewport = orderViewportRef.current
@@ -147,12 +208,23 @@ export function RecommendPage({
 
     const collapseHeroAfterScroll = () => {
       if (phoneContent.scrollTop > 180) setHeroCollapsed(true)
+      const pinned = phoneContent.scrollTop > 18
+      setDockPinned(pinned)
+      if (!pinned) return
+      const shellBounds = phoneContent.closest(".phone-shell")?.getBoundingClientRect()
+      if (!shellBounds) return
+      setDockPinPosition({ left: shellBounds.left + 76, top: shellBounds.top + 66 })
     }
 
+    collapseHeroAfterScroll()
     phoneContent.addEventListener("scroll", collapseHeroAfterScroll, {
       passive: true,
     })
-    return () => phoneContent.removeEventListener("scroll", collapseHeroAfterScroll)
+    window.addEventListener("resize", collapseHeroAfterScroll)
+    return () => {
+      phoneContent.removeEventListener("scroll", collapseHeroAfterScroll)
+      window.removeEventListener("resize", collapseHeroAfterScroll)
+    }
   }, [])
 
   // 扫描面板负责完整相机生命周期，关闭后立即释放摄像头占用。
@@ -408,9 +480,43 @@ export function RecommendPage({
           <p className="text-xs font-semibold text-primary">
             星期四 · 8 月 7 日
           </p>
-          <h1 className="mt-1 text-[27px] font-extrabold tracking-[-0.02em]">
-            趣汇
-          </h1>
+          <div className="mt-1 flex items-center gap-2">
+            <h1 className="text-[27px] font-extrabold tracking-[-0.02em]">
+              趣汇
+            </h1>
+            <button
+              type="button"
+              data-assistant-dock
+              className={`assistant-dock-slot ${
+                assistantDocked ? "is-docked" : ""
+              } ${dockHolding ? "is-holding" : ""} ${
+                dockPinned ? "is-pinned" : ""
+              }`}
+              style={dockPinned && dockPinPosition ? dockPinPosition : undefined}
+              aria-label={
+                assistantDocked
+                  ? "按住三秒弹出悬浮助手"
+                  : "悬浮助手原型预置位"
+              }
+              title={
+                assistantDocked
+                  ? "按住三秒弹出悬浮助手"
+                  : "拖动悬浮助手到这里并停留三秒"
+              }
+              aria-disabled={!assistantDocked}
+              onPointerDown={startDockHold}
+              onPointerMove={moveReleasedAssistant}
+              onPointerUp={endDockPointer}
+              onPointerLeave={() => {
+                if (!releasedAssistantRef.current) clearDockHold()
+              }}
+              onPointerCancel={() => {
+                if (!releasedAssistantRef.current) clearDockHold()
+              }}
+            >
+              <Sparkles size={16} />
+            </button>
+          </div>
           <button
             type="button"
             className="mt-0.5 flex min-h-11 items-center gap-1 text-left text-xs text-muted-foreground"
@@ -519,26 +625,9 @@ export function RecommendPage({
             今日首推已收起 <ChevronRight size={15} />
           </button>
         ) : (
-          <Card className="mb-4 overflow-hidden border-0 bg-[#e5efe8] shadow-none">
-            <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
-              <div>
-                <p className="text-sm font-extrabold text-primary">今日首推</p>
-                <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
-                  <MapPin size={12} /> 距离你 2.8 km
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                aria-label="隐藏今日首推"
-                onClick={() => hideItem("hero", "已隐藏这条首推")}
-              >
-                <MoreHorizontal size={16} />
-              </Button>
-            </div>
+          <Card className="mb-4 h-[160px] gap-0 overflow-hidden border border-border/70 bg-white py-0 shadow-none">
             <div
-              className="grid grid-cols-[0.88fr_1.12fr]"
+              className="relative flex h-full min-h-0"
               role="button"
               tabIndex={0}
               onClick={() => onOpenPostDetail("travel")}
@@ -549,28 +638,31 @@ export function RecommendPage({
                 }
               }}
             >
-              <div className="min-h-[214px] overflow-hidden">
-                <img
-                  className="image-cover"
-                  src={imageUrls.hike}
-                  alt="径山徒步活动"
-                />
+              <div className="h-full w-[38.2%] shrink-0 overflow-hidden rounded-l-xl bg-muted">
+                <img className="image-cover" src={imageUrls.hike} alt="径山徒步活动" />
               </div>
-              <div className="flex flex-col justify-center p-4">
-                <h2 className="text-[18px] leading-tight font-extrabold">
+              <div className="flex min-w-0 flex-1 flex-col py-3 pr-3 pl-3">
+                <div className="flex items-center gap-2 text-xs">
+                  <p className="font-extrabold text-primary">今日首推</p>
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <MapPin size={12} /> 距离你 2.8 km
+                  </span>
+                </div>
+                <h2 className="mt-1 line-clamp-2 text-[17px] leading-tight font-extrabold">
                   周日径山轻徒步
                 </h2>
                 <p className="mt-1 text-xs font-semibold text-primary">
                   还差 2 位同行者
                 </p>
-                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  08:30 集合 · 人均约 ¥68
-                  <br />
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  周日 08:30 集合 · 人均约 ¥68
+                </p>
+                <p className="text-xs leading-5 text-muted-foreground">
                   发起人：林同学 · 已认证
                 </p>
                 <Button
                   type="button"
-                  className="mt-3 h-9 justify-between px-3 text-xs"
+                  className="mt-auto h-8 justify-between px-3 text-xs"
                   onClick={(event) => {
                     event.stopPropagation()
                     showToast("参与操作将在后续流程接入")
@@ -580,6 +672,19 @@ export function RecommendPage({
                   <ChevronRight size={15} />
                 </Button>
               </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="隐藏今日首推"
+                className="absolute top-2 right-2"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  hideItem("hero", "已隐藏这条首推")
+                }}
+              >
+                <MoreHorizontal size={16} />
+              </Button>
             </div>
           </Card>
         )

@@ -19,6 +19,7 @@ export type PageKey =
   | "profile"
   | "membership-detail"
   | "preference-detail"
+  | "assistant-chat"
 export type ActivityType =
   "拼单" | "拼车" | "线下组队" | "线上开黑" | "近邻互助"
 export type ViewerMode = "member" | "guest"

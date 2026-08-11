@@ -84,7 +84,7 @@ export function MembershipDetailPage({
                 <h2 className="mt-1 text-2xl font-extrabold">VIP {membershipTier}</h2>
               </div>
             </div>
-            <Badge className="border-0 bg-white text-primary">累计 EC {earnedPoints}</Badge>
+            <Badge className="border-0 bg-white text-primary">累计获得积分 {earnedPoints}</Badge>
           </div>
           <div className="mt-4 grid grid-cols-3 divide-x divide-[#cbdccd] text-center">
             <div>
@@ -96,8 +96,11 @@ export function MembershipDetailPage({
               <span className="text-[10px] text-muted-foreground">本月邀请</span>
             </div>
             <div>
-              <strong className="block text-sm">
-                N {membershipTiers[membershipTier].normalQuota - normalHelpUsed} · E {membershipTiers[membershipTier].emergencyQuota - emergencyHelpUsed}
+              <strong className="block text-[11px] leading-5">
+                普通求助 {membershipTiers[membershipTier].normalQuota - normalHelpUsed} 条
+              </strong>
+              <strong className="block text-[11px] leading-5">
+                紧急求助 {membershipTiers[membershipTier].emergencyQuota - emergencyHelpUsed} 条
               </strong>
               <span className="text-[10px] text-muted-foreground">本月剩余</span>
             </div>
@@ -117,7 +120,7 @@ export function MembershipDetailPage({
                 : `签到 +${membershipTiers[membershipTier].dailyCheckInPoints}`}
             </Button>
             <Button type="button" variant="outline" onClick={invite}>
-              <UsersRound size={16} /> 邀请新人
+              <UsersRound size={16} /> 邀请新人 +5
             </Button>
           </div>
         </CardContent>
@@ -149,7 +152,7 @@ export function MembershipDetailPage({
                         VIP {tier} {current ? "· 当前等级" : ""}
                       </strong>
                       <span className="mt-1 block text-[11px] leading-5 text-muted-foreground">
-                        EC ≥ {item.minEc} · 每日签到 +{item.dailyCheckInPoints} · 每月普通求助 {item.normalQuota} 次 · 加急求助 {item.emergencyQuota} 次
+                        {tier === 1 ? "" : `累计获得积分满 ${item.minEc} 分 · `}每日签到 +{item.dailyCheckInPoints} · 每月普通求助 {item.normalQuota} 条 · 紧急求助 {item.emergencyQuota} 条
                       </span>
                     </span>
                     <ChevronRight size={16} className="shrink-0 text-muted-foreground" />

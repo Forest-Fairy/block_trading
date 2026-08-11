@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   UsersRound,
   WalletCards,
+  X,
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -296,6 +297,7 @@ export function PostDetailPage({
   const [joined, setJoined] = useState(activity.id === "travel")
   const [toast, setToast] = useState("")
   const [activeImageIndex, setActiveImageIndex] = useState(0)
+  const [galleryPreviewOpen, setGalleryPreviewOpen] = useState(false)
   const [galleryImageRatios, setGalleryImageRatios] = useState<
     Record<string, number>
   >({})
@@ -306,6 +308,8 @@ export function PostDetailPage({
   const [reportReason, setReportReason] = useState("不当内容")
   const [reportNote, setReportNote] = useState("")
   const galleryPointerStartX = useRef<number | null>(null)
+  const gallerySwipeHandledRef = useRef(false)
+  const galleryControlUsedRef = useRef(false)
   const galleryAutoPausedRef = useRef(false)
   const galleryPauseTimerRef = useRef<number | null>(null)
   const meta = typeMeta[activity.type]
@@ -392,6 +396,7 @@ export function PostDetailPage({
 
   const handleGalleryPointerDown = (clientX: number) => {
     if (isGuest) return
+    gallerySwipeHandledRef.current = false
     galleryPointerStartX.current = clientX
   }
 
@@ -400,6 +405,7 @@ export function PostDetailPage({
     const offset = clientX - galleryPointerStartX.current
     galleryPointerStartX.current = null
     if (Math.abs(offset) < 36) return
+    gallerySwipeHandledRef.current = true
     changeImage(offset > 0 ? -1 : 1)
   }
 
@@ -408,12 +414,24 @@ export function PostDetailPage({
     const offset = clientX - galleryPointerStartX.current
     if (Math.abs(offset) < 36) return
     galleryPointerStartX.current = null
+    gallerySwipeHandledRef.current = true
     changeImage(offset > 0 ? -1 : 1)
+  }
+
+  const openGalleryPreview = () => {
+    if (isGuest || gallerySwipeHandledRef.current || galleryControlUsedRef.current) {
+      gallerySwipeHandledRef.current = false
+      galleryControlUsedRef.current = false
+      return
+    }
+    pauseGalleryAuto()
+    setGalleryPreviewOpen(true)
   }
 
   const stopGalleryGesture = (event: PointerEvent<HTMLButtonElement>) => {
     event.stopPropagation()
     galleryPointerStartX.current = null
+    galleryControlUsedRef.current = true
   }
 
   const renderReply = (reply: Reply, depth = 0): ReactNode => (
@@ -503,6 +521,7 @@ export function PostDetailPage({
           onPointerCancel={() => {
             galleryPointerStartX.current = null
           }}
+          onClick={openGalleryPreview}
           onKeyDown={(event) => {
             if (event.key === "ArrowLeft") changeImage(-1)
             if (event.key === "ArrowRight") changeImage(1)
@@ -592,6 +611,9 @@ export function PostDetailPage({
                   type="button"
                   aria-label={`查看第 ${index + 1} 张图片`}
                   aria-current={activeImageIndex === index}
+                  onPointerDown={() => {
+                    galleryControlUsedRef.current = true
+                  }}
                   className={`size-2 rounded-full border border-white transition-colors ${
                     activeImageIndex === index ? "bg-white" : "bg-transparent"
                   }`}
@@ -828,6 +850,62 @@ export function PostDetailPage({
           </div>
         </SheetContent>
       </Sheet>
+      <Dialog
+        open={galleryPreviewOpen}
+        onOpenChange={setGalleryPreviewOpen}
+      >
+        <DialogContent
+          showCloseButton={false}
+          className="gallery-preview-dialog fixed inset-0 max-w-none translate-x-0 translate-y-0 rounded-none border-0 bg-black p-0 text-white ring-0 sm:max-w-none"
+        >
+          <DialogTitle className="sr-only">图片预览</DialogTitle>
+          <div className="relative flex h-full w-full items-center justify-center p-5">
+            <img
+              className="max-h-full max-w-full select-none object-contain"
+              src={activeImage}
+              alt={`${activity.title}图片 ${activeImageIndex + 1}预览`}
+              draggable={false}
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute top-4 right-4 bg-black/45 text-white hover:bg-black/65 hover:text-white"
+              aria-label="关闭图片预览"
+              onClick={() => setGalleryPreviewOpen(false)}
+            >
+              <X size={20} />
+            </Button>
+            {gallery.length > 1 ? (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-1/2 left-3 -translate-y-1/2 bg-black/45 text-white hover:bg-black/65 hover:text-white"
+                  aria-label="预览上一张图片"
+                  onClick={() => changeImage(-1)}
+                >
+                  <ChevronLeft size={22} />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-1/2 right-3 -translate-y-1/2 bg-black/45 text-white hover:bg-black/65 hover:text-white"
+                  aria-label="预览下一张图片"
+                  onClick={() => changeImage(1)}
+                >
+                  <ChevronRight size={22} />
+                </Button>
+              </>
+            ) : null}
+            <span className="absolute right-1/2 bottom-5 translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-xs">
+              {activeImageIndex + 1} / {gallery.length}
+            </span>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={reportTarget !== null}
         onOpenChange={(open) => {

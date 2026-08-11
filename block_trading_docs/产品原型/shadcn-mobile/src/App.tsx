@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useCallback, useState } from "react"
 import { BottomNav, StatusBar } from "@/components/prototype-shell"
 import {
   getMembershipTier,
@@ -16,6 +16,14 @@ import { ProductDetailPage } from "@/pages/ProductDetailPage"
 import { ProfilePage } from "@/pages/ProfilePage"
 import { MembershipDetailPage } from "@/pages/MembershipDetailPage"
 import { PreferenceDetailPage } from "@/pages/PreferenceDetailPage"
+import {
+  AssistantChatPage,
+  type AssistantDraft,
+} from "@/pages/AssistantChatPage"
+import {
+  FloatingAssistant,
+  type AssistantAction,
+} from "@/components/floating-assistant"
 
 type RootPageKey = Exclude<
   PageKey,
@@ -23,6 +31,7 @@ type RootPageKey = Exclude<
   | "product-detail"
   | "membership-detail"
   | "preference-detail"
+  | "assistant-chat"
 >
 
 function App() {
@@ -44,6 +53,44 @@ function App() {
     useState<PreferenceKey>("账号与安全")
   const [detailReturnPage, setDetailReturnPage] =
     useState<RootPageKey>("recommend")
+  const [assistantAction, setAssistantAction] =
+    useState<AssistantAction>("combine")
+  const [assistantDrafts, setAssistantDrafts] = useState<
+    Partial<Record<AssistantAction, AssistantDraft>>
+  >({})
+  const [assistantDocked, setAssistantDocked] = useState(false)
+  const [assistantReleasePointer, setAssistantReleasePointer] = useState<{
+    x: number
+    y: number
+    pointerId: number
+    releasedAt: number
+  } | null>(null)
+  const [assistantFollowPointer, setAssistantFollowPointer] = useState<{
+    x: number
+    y: number
+    pointerId: number
+  } | null>(null)
+  const [assistantFollowEnd, setAssistantFollowEnd] = useState<{
+    x: number
+    y: number
+    pointerId: number
+    endedAt: number
+  } | null>(null)
+  const saveAssistantDraft = useCallback(
+    (action: AssistantAction, draft: AssistantDraft | null) => {
+      setAssistantDrafts((drafts) => {
+        if (draft) return { ...drafts, [action]: draft }
+        const nextDrafts = { ...drafts }
+        delete nextDrafts[action]
+        return nextDrafts
+      })
+    },
+    []
+  )
+  const saveCurrentAssistantDraft = useCallback(
+    (draft: AssistantDraft | null) => saveAssistantDraft(assistantAction, draft),
+    [assistantAction, saveAssistantDraft]
+  )
   const toggleCampusPreview = (enabled: boolean) => {
     // 顶部入口是原型预览快捷开关，开启时模拟当前用户已完成学生认证。
     if (enabled) setStudentVerified(true)
@@ -90,6 +137,17 @@ function App() {
         }
         campusMode={campusMode}
         viewerMode={viewerMode}
+        assistantDocked={assistantDocked}
+        onReleaseAssistant={(pointer) => {
+          setAssistantReleasePointer({ ...pointer, releasedAt: Date.now() })
+          setAssistantFollowPointer(pointer)
+          setAssistantDocked(false)
+        }}
+        onMoveReleasedAssistant={setAssistantFollowPointer}
+        onEndReleasedAssistant={(pointer) => {
+          setAssistantFollowPointer(null)
+          setAssistantFollowEnd({ ...pointer, endedAt: Date.now() })
+        }}
       />
     ) : page === "search" ? (
       <SearchPage
@@ -154,6 +212,13 @@ function App() {
         preference={selectedPreference}
         onBack={() => setPage("profile")}
       />
+    ) : page === "assistant-chat" ? (
+      <AssistantChatPage
+        action={assistantAction}
+        initialDraft={assistantDrafts[assistantAction]}
+        onClose={() => setPage(detailReturnPage)}
+        onSaveDraft={saveCurrentAssistantDraft}
+      />
     ) : (
       <ProfilePage
         campusMode={campusMode}
@@ -181,11 +246,35 @@ function App() {
           onCampusModeChange={toggleCampusPreview}
         />
         <main className="phone-content">{content}</main>
+        {page !== "assistant-chat" ? (
+          <FloatingAssistant
+            draftActions={Object.keys(assistantDrafts) as AssistantAction[]}
+            docked={assistantDocked}
+            onDockChange={setAssistantDocked}
+            releasePointer={assistantReleasePointer}
+            followPointer={assistantFollowPointer}
+            followEnd={assistantFollowEnd}
+            onSelect={(action) => {
+              setAssistantAction(action)
+              setDetailReturnPage(
+                page === "search" ||
+                  page === "post-detail" ||
+                  page === "product-detail" ||
+                  page === "membership-detail" ||
+                  page === "preference-detail"
+                  ? "recommend"
+                  : page
+              )
+              setPage("assistant-chat")
+            }}
+          />
+        ) : null}
         {page !== "search" &&
         page !== "post-detail" &&
         page !== "product-detail" &&
         page !== "membership-detail" &&
-        page !== "preference-detail" ? (
+        page !== "preference-detail" &&
+        page !== "assistant-chat" ? (
           <BottomNav
             current={page}
             onChange={setPage}
