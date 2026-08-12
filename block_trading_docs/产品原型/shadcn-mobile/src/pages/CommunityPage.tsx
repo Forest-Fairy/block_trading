@@ -26,13 +26,21 @@ import {
   activities,
   verifiedActivityIds,
   isActivityVisible,
+  type ActivityType,
   type ViewerMode,
 } from "@/prototype/data"
+import { getPostDraftFields } from "@/prototype/post-schema"
 import {
   IconButton,
   PageHeader,
   CommunityCard,
 } from "@/components/prototype-shell"
+import { formatCurrentLocation } from "@/lib/location-display"
+
+const communityArea = formatCurrentLocation({
+  district: "滨江区",
+  street: "西兴街道",
+})
 
 export function CommunityPage({
   onOpenSearch,
@@ -53,8 +61,9 @@ export function CommunityPage({
     Record<string, string>
   >({})
   const [createOpen, setCreateOpen] = useState(false)
-  const [createType, setCreateType] = useState("拼单")
-  const [helpUrgent, setHelpUrgent] = useState(false)
+  const [createType, setCreateType] = useState<ActivityType>("拼单")
+  const [createDraft, setCreateDraft] = useState<Record<string, string>>({})
+  const [createAdvancedOpen, setCreateAdvancedOpen] = useState(false)
   const [created, setCreated] = useState(false)
   const [joinedIds] = useState<string[]>(["travel"])
   const [communityPage, setCommunityPage] = useState(1)
@@ -209,19 +218,30 @@ export function CommunityPage({
     )
   }
 
-  const createTypes: Array<{ Icon: typeof UsersRound; label: string }> = [
+  const createTypes: Array<{ Icon: typeof UsersRound; label: ActivityType }> = [
     { Icon: UsersRound, label: "拼单" },
     { Icon: Bike, label: "拼车" },
     { Icon: UsersRound, label: "线下组队" },
     { Icon: Gamepad2, label: "线上开黑" },
     { Icon: UsersRound, label: "近邻互助" },
   ]
-  const hasParticipantRange = createType === "拼车" || createType === "线上开黑"
+  const createFields = getPostDraftFields(createType)
+  const createRequiredFields = createFields.filter(
+    (field) => field.required && !field.defaulted
+  )
+  const createAdvancedFields = createFields.filter((field) => field.advanced)
+  const missingCreateFields = createRequiredFields.filter(
+    (field) => !createDraft[field.key]?.trim()
+  )
   const activityLabel = campusMode ? "校园活动" : "社区活动"
+
+  const updateCreateDraft = (key: string, value: string) => {
+    setCreateDraft((draft) => ({ ...draft, [key]: value }))
+  }
   return (
     <div className="page-content">
       <PageHeader
-        eyebrow={campusMode ? "杭州大学 · 同校活动" : "杭州 · 27 个活动可参与"}
+        eyebrow={campusMode ? "杭州大学 · 同校活动" : "滨江区 · 27 个活动可参与"}
         title={campusMode ? "校园" : "社区"}
         action={
           <IconButton label="搜索" onClick={onOpenSearch}>
@@ -261,23 +281,35 @@ export function CommunityPage({
         </div>
       ) : null}
 
-      <Tabs
-        value={activeType}
-        onValueChange={(value) => {
-          setActiveType(value)
-          resetCommunityPagination()
-        }}
-        className="mb-4"
-      >
-        <TabsList className="w-full bg-muted">
-          <TabsTrigger value="全部">全部</TabsTrigger>
-          <TabsTrigger value="拼单">拼单</TabsTrigger>
-          <TabsTrigger value="拼车">拼车</TabsTrigger>
-          <TabsTrigger value="线下组队">线下组队</TabsTrigger>
-          <TabsTrigger value="线上开黑">线上开黑</TabsTrigger>
-          <TabsTrigger value="近邻互助">近邻互助</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div className="hide-scrollbar -mx-4 mb-4 overflow-x-auto overscroll-x-contain px-4 touch-pan-x snap-x snap-mandatory">
+        <Tabs
+          value={activeType}
+          onValueChange={(value) => {
+            setActiveType(value)
+            resetCommunityPagination()
+          }}
+          className="w-[116%]"
+        >
+          <TabsList className="w-full justify-start gap-[2%] bg-muted p-1">
+            {[
+              "全部",
+              "拼单",
+              "拼车",
+              "线下组队",
+              "线上开黑",
+              "近邻互助",
+            ].map((type) => (
+              <TabsTrigger
+                key={type}
+                value={type}
+                className="h-9 w-1/5 shrink-0 snap-start !flex-none"
+              >
+                {type}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      </div>
 
       {activeFilters.length ? (
         <div className="hide-scrollbar mb-4 flex gap-2 overflow-x-auto">
@@ -285,7 +317,7 @@ export function CommunityPage({
             <button
               key={filter}
               type="button"
-              className="shrink-0 rounded-full bg-secondary px-3 py-1.5 text-[11px] font-semibold text-primary"
+              className="shrink-0 rounded-full bg-secondary px-3 py-1.5 text-[0.6875rem] font-semibold text-primary"
               onClick={() => toggleCommunityFilter(filter)}
             >
               {filter} · 移除
@@ -300,14 +332,14 @@ export function CommunityPage({
             {communityView === "发现" ? "可参与活动" : "我的社区进度"}
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            {filteredActivities.length} 条匹配内容 · 杭州
+            {filteredActivities.length} 条匹配内容 · {communityArea}
           </p>
         </div>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="h-8 gap-1 text-[10px]"
+          className="h-8 gap-1 text-[0.625rem]"
           onClick={() => setFilterOpen(true)}
         >
           <SlidersHorizontal size={13} /> {communitySort}
@@ -388,7 +420,7 @@ export function CommunityPage({
       <Sheet open={filterOpen} onOpenChange={setFilterOpen}>
         <SheetContent
           side="right"
-          className="w-[min(92vw,380px)] overflow-y-auto p-0"
+          className="w-[min(92vw,24rem)] overflow-y-auto p-0"
         >
           <SheetHeader>
             <SheetTitle>
@@ -427,7 +459,7 @@ export function CommunityPage({
                   }
                 />
                 <Input
-                  placeholder="收货地点，例如：城西"
+                  placeholder="收货地点，例如：西兴街道"
                   value={communityFilterValues.receiveLocation || ""}
                   onChange={(event) =>
                     updateCommunityFilter("receiveLocation", event.target.value)
@@ -557,7 +589,7 @@ export function CommunityPage({
           <SheetHeader>
             <SheetTitle>发起一场{activityLabel}</SheetTitle>
             <SheetDescription>
-              选择你要聚集的人，再补充时间、地点和人数。
+              默认定位只展示市区；线下帖子可补充并展示精确地点。
             </SheetDescription>
           </SheetHeader>
           <div className="space-y-4 overflow-y-auto px-4 pb-3">
@@ -566,12 +598,12 @@ export function CommunityPage({
                 <span className="text-xs font-semibold">帖子默认可见范围</span>
                 <Badge
                   variant="outline"
-                  className="border-0 bg-white text-[10px] text-primary"
+                  className="border-0 bg-white text-[0.625rem] text-primary"
                 >
                   {campusMode ? "仅同校可见" : "公开可见"}
                 </Badge>
               </div>
-              <p className="mt-1 text-[11px] text-muted-foreground">
+              <p className="mt-1 text-[0.6875rem] text-muted-foreground">
                 {campusMode
                   ? "校园版已开启，新帖子默认只向同校用户展示。"
                   : "可在我的偏好设置中开启校园版。"}
@@ -584,42 +616,74 @@ export function CommunityPage({
                   type="button"
                   variant={label === createType ? "default" : "outline"}
                   className="h-12 flex-col gap-1 text-xs"
-                  onClick={() => setCreateType(label)}
+                  onClick={() => {
+                    setCreateType(label)
+                    setCreateDraft({})
+                    setCreateAdvancedOpen(false)
+                  }}
                 >
                   <Icon size={16} />
                   {label}
                 </Button>
               ))}
             </div>
-            <Input placeholder="活动标题，例如：周末一起去露营" />
-            <Input placeholder="时间、地点或线上房间" />
-            {hasParticipantRange ? (
-              <div className="grid grid-cols-2 gap-2">
-                <Input placeholder="最少人数，例如：2" type="number" />
-                <Input placeholder="最多人数，例如：4" type="number" />
+            <div className="space-y-3">
+              {createRequiredFields.map((field) => (
+                <label key={field.key} className="block space-y-1.5">
+                  <span className="text-xs font-semibold">
+                    {field.label} <span className="text-[var(--qh-coral)]">*</span>
+                  </span>
+                  <Input
+                    aria-label={field.label}
+                    type={field.inputType}
+                    placeholder={field.placeholder}
+                    value={createDraft[field.key] ?? ""}
+                    onChange={(event) =>
+                      updateCreateDraft(field.key, event.target.value)
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+            <p className="text-[0.6875rem] text-muted-foreground">
+              位置默认只展示当前市区；报名或响应截止会按主时间预填，可在更多说明中调整。
+            </p>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-primary"
+              onClick={() => setCreateAdvancedOpen((open) => !open)}
+            >
+              {createAdvancedOpen ? "收起更多说明" : "更多说明（可选）"}
+            </Button>
+            {createAdvancedOpen ? (
+              <div className="space-y-3 rounded-lg bg-muted p-3">
+                {createAdvancedFields.map((field) => (
+                  <label key={field.key} className="block space-y-1.5">
+                    <span className="text-xs font-semibold">{field.label}</span>
+                    <Input
+                      aria-label={field.label}
+                      type={field.inputType}
+                      placeholder={field.placeholder}
+                      value={createDraft[field.key] ?? ""}
+                      onChange={(event) =>
+                        updateCreateDraft(field.key, event.target.value)
+                      }
+                    />
+                  </label>
+                ))}
+                <p className="text-[0.6875rem] text-muted-foreground">
+                  精确地点仅向你选择的可见范围展示，请勿填写家庭住址和联系方式。
+                </p>
               </div>
-            ) : createType === "近邻互助" ? (
-              <div className="space-y-2">
-                <Input placeholder="描述需求，例如：明天下午借一副羽毛球拍" />
-                <div className="grid grid-cols-2 gap-2">
-                  <Input placeholder="即时 / 时段" />
-                  <Input placeholder="最晚响应时间" />
-                </div>
-                <Button
-                  type="button"
-                  variant={helpUrgent ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setHelpUrgent((value) => !value)}
-                >
-                  {helpUrgent ? "已标记加急" : "标记为加急"}
-                </Button>
-              </div>
-            ) : (
-              <Input placeholder="目标人数，例如：5" type="number" />
-            )}
-            {hasParticipantRange ? (
-              <p className="text-[11px] text-muted-foreground">
-                达到最少人数即可成立，达到最多人数后停止继续加入。
+            ) : null}
+            {missingCreateFields.length ? (
+              <p className="text-[0.6875rem] text-[var(--qh-coral)]">
+                还需填写：{missingCreateFields
+                  .slice(0, 2)
+                  .map((field) => field.label)
+                  .join("、")}
               </p>
             ) : null}
             <div className="rounded-lg bg-muted p-3 text-xs leading-relaxed text-muted-foreground">
@@ -629,10 +693,15 @@ export function CommunityPage({
           <SheetFooter>
             <Button
               type="button"
+              disabled={missingCreateFields.length > 0}
               onClick={() => {
                 setCreateOpen(false)
                 setCreated(true)
-                showCommunityToast(`${createType}草稿已保存`)
+                showCommunityToast(
+                  createDraft.preciseLocation?.trim()
+                    ? `${createType}草稿已保存，已包含精确地点`
+                    : `${createType}草稿已保存，仅展示当前市区`
+                )
               }}
               className="w-full"
             >

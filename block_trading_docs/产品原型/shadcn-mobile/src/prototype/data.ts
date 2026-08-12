@@ -83,6 +83,33 @@ export type Activity = {
   isPublic?: boolean
   commentCount?: number
   replyCount?: number
+  details?: ActivityDetails
+}
+
+export type ActivityDetails = {
+  productName?: string
+  specification?: string
+  estimatedUnitAmountCent?: number
+  targetQuantity?: number
+  quantityUnit?: string
+  fulfillmentMode?: string
+  tripRole?: "车主" | "乘客"
+  originName?: string
+  destinationName?: string
+  pickupLocation?: string
+  fareMode?: "免费" | "AA" | "固定金额"
+  fareAmountCent?: number
+  luggageRule?: string
+  activityCategory?: string
+  estimatedAmountCent?: number
+  participantRequirement?: string
+  gameCategory?: string
+  gameName?: string
+  platform?: string
+  durationMinutes?: number
+  skillRequirement?: string
+  voiceRequirement?: string
+  helpCategory?: string
 }
 
 export const imageUrls = {
@@ -101,7 +128,7 @@ export const activities: Activity[] = [
     id: "snacks",
     type: "拼单",
     title: "周末山姆零食拼单",
-    detail: "周六 18:00 截止 · 配送到滨江",
+    detail: "周六 18:00 截止 · 配送到滨江区",
     currentParticipants: 3,
     minParticipants: 5,
     maxParticipants: 5,
@@ -112,11 +139,19 @@ export const activities: Activity[] = [
     authorId: "lin-zhi-xia",
     campusId: "hangzhou-university",
     authorFollowed: false,
+    details: {
+      productName: "山姆零食组合包",
+      specification: "12 件装",
+      estimatedUnitAmountCent: 8600,
+      targetQuantity: 5,
+      quantityUnit: "人份",
+      fulfillmentMode: "周六 18:00 后自提",
+    },
   },
   {
     id: "airport",
     type: "拼车",
-    title: "萧山机场 → 城西拼车",
+    title: "萧山机场 → 西兴街道拼车",
     detail: "周五 19:30 出发 · 还有 2 个座位",
     currentParticipants: 2,
     minParticipants: 2,
@@ -128,6 +163,15 @@ export const activities: Activity[] = [
     authorId: "zhou-tong-xue",
     campusId: "zhejiang-university",
     authorFollowed: true,
+    details: {
+      tripRole: "乘客",
+      originName: "萧山机场",
+      destinationName: "西兴街道",
+      pickupLocation: "T3 到达层 6 号门",
+      fareMode: "AA",
+      fareAmountCent: 4500,
+      luggageRule: "可放 24 寸行李箱",
+    },
   },
   {
     id: "game",
@@ -144,6 +188,13 @@ export const activities: Activity[] = [
     authorId: "alex",
     campusId: "hangzhou-university",
     authorFollowed: false,
+    details: {
+      gameCategory: "MOBA",
+      gameName: "王者荣耀",
+      platform: "微信区 · 语音房",
+      durationMinutes: 120,
+      skillRequirement: "黄金以上，可听麦",
+    },
   },
   {
     id: "travel",
@@ -160,6 +211,12 @@ export const activities: Activity[] = [
     authorId: "chen-yu",
     campusId: "hangzhou-normal-university",
     authorFollowed: false,
+    details: {
+      activityCategory: "露营 + 轻徒步",
+      destinationName: "安吉 · 竹海营地",
+      estimatedAmountCent: 18800,
+      participantRequirement: "自备徒步鞋，接受拼房",
+    },
   },
   {
     id: "groceries",
@@ -176,6 +233,14 @@ export const activities: Activity[] = [
     authorId: "xiao-zhou",
     campusId: "hangzhou-university",
     authorFollowed: false,
+    details: {
+      productName: "邻里有机蔬菜箱",
+      specification: "时令组合",
+      estimatedUnitAmountCent: 3200,
+      targetQuantity: 8,
+      quantityUnit: "份",
+      fulfillmentMode: "小区门口自提",
+    },
   },
   {
     id: "badminton",
@@ -192,6 +257,12 @@ export const activities: Activity[] = [
     authorId: "momo",
     campusId: "hangzhou-university",
     authorFollowed: false,
+    details: {
+      activityCategory: "羽毛球双打",
+      destinationName: "星耀城运动馆",
+      estimatedAmountCent: 3500,
+      participantRequirement: "自备球拍，初学友好",
+    },
   },
   {
     id: "racket-help",
@@ -219,8 +290,58 @@ export const activities: Activity[] = [
     isPublic: true,
     commentCount: 3,
     replyCount: 4,
+    details: {
+      helpCategory: "借用",
+    },
   },
 ]
+
+function yuan(cents: number) {
+  return `¥ ${cents / 100}`
+}
+
+export function getActivityDetailFields(activity: Activity): Array<[string, string]> {
+  const details = activity.details ?? {}
+  switch (activity.type) {
+    case "拼单":
+      return [
+        ["商品与规格", [details.productName, details.specification].filter(Boolean).join(" · ")],
+        ["预估人均", details.estimatedUnitAmountCent ? `${yuan(details.estimatedUnitAmountCent)} / 人` : "待协商"],
+        ["目标数量", details.targetQuantity ? `${details.targetQuantity} ${details.quantityUnit ?? "份"}` : "待确认"],
+        ["交付方式", details.fulfillmentMode ?? "待确认"],
+      ]
+    case "拼车":
+      return [
+        ["路线", [details.originName, details.destinationName].filter(Boolean).join(" → ")],
+        ["上车地点", details.pickupLocation ?? "报名后确认"],
+        ["费用方式", details.fareAmountCent ? `${yuan(details.fareAmountCent)} / 人 · ${details.fareMode ?? "固定金额"}` : details.fareMode ?? "待协商"],
+        ["行李限制", details.luggageRule ?? "未说明"],
+      ]
+    case "线下组队":
+      return [
+        ["活动类型", details.activityCategory ?? "线下活动"],
+        ["目的地", details.destinationName ?? "待确认"],
+        ["预估人均", details.estimatedAmountCent ? `${yuan(details.estimatedAmountCent)} / 人` : "待协商"],
+        ["参与要求", details.participantRequirement ?? "未说明"],
+      ]
+    case "线上开黑":
+      return [
+        ["游戏类目", [details.gameCategory, details.gameName].filter(Boolean).join(" · ")],
+        ["平台", details.platform ?? "待确认"],
+        ["活动时长", details.durationMinutes ? `预计 ${details.durationMinutes} 分钟` : "待确认"],
+        ["段位/语音", details.skillRequirement ?? details.voiceRequirement ?? "不限"],
+      ]
+    case "近邻互助":
+      return [
+        ["求助类型", details.helpCategory ?? "临时协助"],
+        ["报酬", activity.reward ?? "无报酬/协商"],
+        ["需求时效性", activity.helpTiming ?? "即时"],
+        ["需求时间", activity.neededWindow ?? activity.neededAt ?? "尽快"],
+        ["最晚响应", activity.latestResponseAt ?? "待确认"],
+        ["是否加急", activity.urgent ? "加急" : "普通求助"],
+      ]
+  }
+}
 
 export const verifiedActivityIds = new Set([
   "snacks",

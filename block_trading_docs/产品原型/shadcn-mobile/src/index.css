@@ -46,10 +46,10 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 0.25rem);
+  --radius-md: calc(var(--radius) - 0.125rem);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 0.25rem);
 }
 
 * {
@@ -64,11 +64,10 @@ body,
 }
 
 body {
-  min-width: 320px;
   background: #dfe6e0;
   color: var(--foreground);
   font-family: "Noto Sans SC", "Inter", ui-sans-serif, system-ui, sans-serif;
-  font-size: 14px;
+  font-size: 0.875rem;
   letter-spacing: 0;
 }
 
@@ -86,46 +85,46 @@ button {
   min-height: 100svh;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: clamp(1rem, 6vw, 1.5rem);
 }
 
 .phone-shell {
   position: relative;
   display: flex;
-  width: min(100%, 430px);
-  height: min(900px, calc(100svh - 48px));
-  min-height: 680px;
+  inline-size: min(100%, 26.875rem);
+  block-size: min(56.25rem, calc(100svh - clamp(2rem, 12vw, 3rem)));
+  min-block-size: min(42.5rem, calc(100svh - 2rem));
   flex-direction: column;
   overflow: hidden;
   border: 1px solid rgba(29, 118, 87, 0.12);
-  border-radius: 26px;
+  border-radius: 1.625rem;
   background: var(--background);
   box-shadow: 0 22px 60px rgba(35, 59, 46, 0.2);
 }
 
 .status-bar {
   display: flex;
-  height: 34px;
-  flex: 0 0 34px;
+  block-size: 2.125rem;
+  flex: 0 0 2.125rem;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
+  padding-inline: 1.25rem;
   color: #415248;
-  font-size: 11px;
+  font-size: 0.6875rem;
   font-weight: 700;
 }
 
 .status-campus-button {
   display: inline-flex;
-  height: 24px;
+  min-block-size: 1.5rem;
   align-items: center;
-  gap: 3px;
+  gap: 0.1875rem;
   border: 1px solid rgba(29, 118, 87, 0.18);
-  border-radius: 6px;
+  border-radius: 0.375rem;
   background: rgba(255, 255, 255, 0.72);
-  padding: 0 6px;
+  padding-inline: 0.375rem;
   color: var(--primary);
-  font-size: 9px;
+  font-size: 0.5625rem;
   font-weight: 700;
 }
 
@@ -152,10 +151,11 @@ button {
 }
 
 .floating-assistant {
+  --assistant-ball-size: clamp(3.25rem, 14vw, 4rem);
   position: absolute;
   z-index: 20;
-  width: 64px;
-  height: 64px;
+  inline-size: var(--assistant-ball-size);
+  aspect-ratio: 1;
   touch-action: none;
   -webkit-user-select: none;
   user-select: none;
@@ -177,44 +177,52 @@ button {
 }
 
 .floating-assistant-right.is-collapsed {
-  transform: translateX(42px);
+  transform: translateX(calc(var(--assistant-ball-size) * 0.65625));
 }
 
 .floating-assistant-left.is-collapsed {
-  transform: translateX(-42px);
+  transform: translateX(calc(var(--assistant-ball-size) * -0.65625));
 }
 
 .assistant-ball {
   position: relative;
   display: flex;
-  width: 64px;
-  height: 64px;
+  inline-size: 100%;
+  aspect-ratio: 1;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
+  gap: 0.0625rem;
   border: 1px solid rgba(255, 255, 255, 0.68);
-  border-radius: 999px;
+  border-radius: 999rem;
   background: var(--primary);
   color: white;
   box-shadow: 0 8px 20px rgba(29, 118, 87, 0.32);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 800;
   touch-action: none;
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .floating-assistant.is-docking .assistant-ball::after,
 .assistant-dock-slot.is-holding::after {
   position: absolute;
-  inset: -4px;
+  inset: -0.25rem;
   border-radius: inherit;
-  background: conic-gradient(var(--accent) var(--assistant-dock-progress), transparent 0deg);
+  background: conic-gradient(
+    var(--accent) var(--assistant-dock-progress),
+    transparent 0deg
+  );
   content: "";
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
   mask-composite: exclude;
-  padding: 3px;
+  padding: 0.1875rem;
   pointer-events: none;
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   animation: assistant-dock-progress 2.4s linear forwards;
 }
@@ -238,7 +246,8 @@ button {
 }
 
 .floating-assistant.is-docking-stage-embed .assistant-ball {
-  animation: assistant-dock-embed 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+  animation: assistant-dock-embed 0.8s cubic-bezier(0.22, 0.61, 0.36, 1)
+    forwards;
 }
 
 .floating-assistant.is-popping .assistant-ball {
@@ -287,7 +296,7 @@ button {
   }
 
   to {
-    transform: rotate(1080deg) scale(0.5);
+    transform: rotate(1080deg) scale(calc(var(--assistant-embed-scale, 0.56) * 0.82));
   }
 }
 
@@ -310,15 +319,35 @@ button {
 .assistant-dock-slot {
   position: relative;
   display: inline-flex;
-  width: 36px;
-  height: 36px;
+  inline-size: 2.25rem;
+  aspect-ratio: 1;
   align-items: center;
   justify-content: center;
   border: 1.5px dashed var(--primary);
-  border-radius: 999px;
+  border-radius: 999rem;
   background: transparent;
   color: var(--primary);
   touch-action: none;
+  transition: transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.assistant-dock-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.assistant-dock-wrap .assistant-embedded-menu {
+  top: 2.625rem;
+  left: 0;
+  z-index: 25;
+}
+
+.assistant-dock-slot.is-menu-open {
+  transform: rotate(135deg);
+}
+
+.assistant-dock-slot.is-holding::after {
+  animation-duration: 2s;
 }
 
 .assistant-dock-slot[aria-disabled="true"] {
@@ -345,38 +374,58 @@ button {
   position: absolute;
   top: 0;
   display: grid;
-  width: 132px;
-  gap: 6px;
+  inline-size: min(34vw, 8.25rem);
+  gap: 0.375rem;
   animation: assistant-menu-in 140ms ease-out;
+}
+
+.floating-assistant .assistant-menu::before {
+  position: absolute;
+  inset: -0.5rem;
+  z-index: 0;
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  border-radius: 0.75rem;
+  background: rgba(247, 251, 248, 0.64);
+  box-shadow: 0 10px 24px rgba(35, 59, 46, 0.16);
+  content: "";
+  pointer-events: none;
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
 }
 
 .assistant-menu-bottom-aligned {
   top: auto;
-  bottom: 32px;
+  bottom: 2rem;
 }
 
 .floating-assistant-right .assistant-menu {
-  right: 74px;
+  right: calc(var(--assistant-ball-size) + 0.625rem);
 }
 
 .floating-assistant-left .assistant-menu {
-  left: 74px;
+  left: calc(var(--assistant-ball-size) + 0.625rem);
 }
 
 .assistant-menu-item {
-  height: 38px;
+  position: relative;
+  z-index: 1;
+  min-block-size: clamp(2.375rem, 9.75vw, 2.75rem);
   justify-content: flex-start;
   background: rgba(255, 255, 255, 0.96);
-  padding: 0 10px;
+  padding-inline: 0.625rem;
   color: var(--foreground);
   box-shadow: 0 5px 14px rgba(35, 59, 46, 0.14);
 }
 
+.floating-assistant.is-menu-open .assistant-ball {
+  transform: rotate(135deg);
+}
+
 .assistant-draft-dot {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 8px;
-  border-radius: 999px;
+  inline-size: 0.5rem;
+  aspect-ratio: 1;
+  flex: 0 0 0.5rem;
+  border-radius: 999rem;
   background: #f3bf54;
   box-shadow: 0 0 0 2px rgba(243, 191, 84, 0.22);
 }
@@ -402,30 +451,30 @@ button {
 
 .assistant-chat-header {
   display: flex;
-  height: 58px;
+  min-block-size: 3.625rem;
   align-items: center;
-  gap: 8px;
+  gap: 0.5rem;
   border-bottom: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.84);
-  padding: 0 12px;
+  padding-inline: 0.75rem;
 }
 
 .assistant-chat-scroll {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 12px;
+  gap: 0.75rem;
   overflow-y: auto;
-  padding: 16px;
+  padding: 1rem;
 }
 
 .assistant-bot-message,
 .assistant-user-message {
   width: fit-content;
-  max-width: 84%;
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 13px;
+  max-inline-size: 84%;
+  border-radius: 0.5rem;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.8125rem;
   line-height: 1.55;
 }
 
@@ -444,11 +493,11 @@ button {
 .assistant-type-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: 0.5rem;
 }
 
 .assistant-type-options button {
-  height: 40px;
+  min-block-size: 2.5rem;
 }
 
 .assistant-draft-card {
@@ -458,10 +507,10 @@ button {
 .assistant-draft-field {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
+  gap: 0.75rem;
   border-top: 1px solid var(--border);
-  padding: 7px 0;
-  font-size: 12px;
+  padding-block: 0.4375rem;
+  font-size: 0.75rem;
 }
 
 .assistant-draft-field span {
@@ -477,10 +526,10 @@ button {
 
 .assistant-input-bar {
   display: flex;
-  gap: 8px;
+  gap: 0.5rem;
   border-top: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.96);
-  padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+  padding: 0.625rem 0.75rem max(0.625rem, env(safe-area-inset-bottom));
 }
 
 .assistant-input-bar input {
@@ -491,15 +540,15 @@ button {
 .assistant-manual-page {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: 1rem;
 }
 
 .assistant-image-picker {
   display: grid;
-  min-height: 142px;
+  min-block-size: clamp(7.25rem, 36vw, 8.875rem);
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 0.5rem;
+  margin-block-end: 0.625rem;
 }
 
 .assistant-poster,
@@ -507,26 +556,26 @@ button {
 .assistant-add-image {
   position: relative;
   display: flex;
-  min-height: 116px;
+  min-block-size: clamp(5.75rem, 30vw, 7.25rem);
   align-items: center;
   justify-content: center;
   overflow: hidden;
   border: 1px dashed var(--border);
-  border-radius: 8px;
-  padding: 8px;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
   text-align: center;
 }
 
 .assistant-poster {
   grid-column: span 2;
-  min-height: 142px;
+  min-block-size: clamp(7.25rem, 36vw, 8.875rem);
   border-style: solid;
 }
 
 .assistant-poster span {
-  max-width: 86%;
+  max-inline-size: 86%;
   color: #1d7657;
-  font-size: 20px;
+  font-size: 1.25rem;
   font-weight: 900;
   line-height: 1.25;
   text-shadow:
@@ -537,32 +586,32 @@ button {
 }
 
 .assistant-image-item {
-  min-height: 92px;
+  min-block-size: clamp(4.5rem, 24vw, 5.75rem);
   background: var(--muted);
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: 0.6875rem;
   word-break: break-all;
 }
 
 .assistant-image-item b {
   position: absolute;
-  top: 5px;
-  right: 5px;
-  border-radius: 4px;
+  top: 0.3125rem;
+  right: 0.3125rem;
+  border-radius: 0.25rem;
   background: var(--primary);
-  padding: 2px 5px;
+  padding: 0.125rem 0.3125rem;
   color: white;
-  font-size: 10px;
+  font-size: 0.625rem;
 }
 
 .assistant-add-image {
-  min-height: 142px;
+  min-block-size: clamp(7.25rem, 36vw, 8.875rem);
   flex-direction: column;
-  gap: 5px;
+  gap: 0.3125rem;
   border-color: var(--primary);
   background: white;
   color: var(--primary);
-  font-size: 12px;
+  font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
 }
@@ -571,50 +620,49 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 0.5rem;
   border-top: 1px solid var(--border);
-  padding-top: 7px;
+  padding-top: 0.4375rem;
   color: var(--qh-blue);
-  font-size: 11px;
+  font-size: 0.6875rem;
 }
 
 .assistant-recording-state {
   position: absolute;
-  right: 16px;
-  bottom: 72px;
-  left: 16px;
+  inset-inline: 1rem;
+  bottom: clamp(3.5rem, 18vw, 4.5rem);
   z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  border-radius: 8px;
+  gap: 0.4375rem;
+  border-radius: 0.5rem;
   background: var(--foreground);
-  padding: 10px 12px;
+  padding: 0.625rem 0.75rem;
   color: white;
-  font-size: 12px;
+  font-size: 0.75rem;
   box-shadow: 0 8px 20px rgba(35, 59, 46, 0.2);
 }
 
 .page-content {
   min-height: 100%;
-  padding: 12px 16px 20px;
+  padding: 0.75rem 1rem 1.25rem;
 }
 
 .page-title {
-  font-size: 24px;
+  font-size: 1.5rem;
   font-weight: 800;
   line-height: 1.2;
 }
 
 .section-title {
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 800;
   line-height: 1.3;
 }
 
 .safe-bottom {
-  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
 
 .image-cover {
@@ -628,11 +676,11 @@ button {
   z-index: 30;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 2px;
-  margin: 8px 12px 12px;
-  padding: 5px;
+  gap: 0.125rem;
+  margin: 0.5rem 0.75rem 0.75rem;
+  padding: 0.3125rem;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 999rem;
   background: rgba(255, 255, 255, 0.9);
   box-shadow: 0 5px 18px rgba(23, 53, 38, 0.1);
   backdrop-filter: blur(16px);
@@ -640,14 +688,14 @@ button {
 
 .bottom-nav-item {
   display: flex;
-  min-height: 54px;
+  min-block-size: clamp(3.25rem, 14vw, 3.625rem);
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  border-radius: 999px;
+  gap: 0.125rem;
+  border-radius: 999rem;
   color: var(--muted-foreground);
-  font-size: 10px;
+  font-size: 0.625rem;
   font-weight: 600;
   transition:
     background 160ms ease,
@@ -671,18 +719,18 @@ button {
 
 .unread-dot {
   position: absolute;
-  top: -3px;
-  right: -7px;
+  top: -0.1875rem;
+  right: -0.4375rem;
   display: inline-flex;
-  min-width: 16px;
-  height: 16px;
+  min-inline-size: 1rem;
+  block-size: 1rem;
   align-items: center;
   justify-content: center;
-  padding: 0 4px;
-  border-radius: 999px;
+  padding-inline: 0.25rem;
+  border-radius: 999rem;
   background: var(--qh-coral);
   color: white;
-  font-size: 9px;
+  font-size: 0.5625rem;
   font-weight: 800;
 }
 
@@ -698,16 +746,16 @@ button {
   pointer-events: none;
   position: fixed;
   z-index: 50;
-  bottom: 96px;
+  bottom: 6rem;
   left: 50%;
-  width: min(calc(100% - 32px), 398px);
+  inline-size: min(calc(100% - 2rem), 24.875rem);
   transform: translateX(-50%);
   border-radius: var(--radius-lg);
   background: var(--foreground);
   color: white;
-  padding: 8px 12px;
+  padding: 0.5rem 0.75rem;
   text-align: center;
-  font-size: 12px;
+  font-size: 0.75rem;
   box-shadow: 0 8px 24px rgba(23, 53, 38, 0.2);
 }
 
@@ -721,7 +769,7 @@ button {
 .profile-summary-marquee-track {
   display: inline-block;
   min-width: max-content;
-  padding-right: 28px;
+  padding-right: 1.75rem;
   animation: profile-summary-marquee 6s ease-in-out infinite alternate;
 }
 
@@ -752,7 +800,7 @@ button {
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 30rem) {
   .prototype-stage {
     padding: 0;
   }

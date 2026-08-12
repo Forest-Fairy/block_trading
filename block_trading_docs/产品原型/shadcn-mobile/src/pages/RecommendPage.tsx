@@ -48,6 +48,25 @@ import {
   type ViewerMode,
 } from "@/prototype/data"
 import { IconButton } from "@/components/prototype-shell"
+import {
+  AssistantMenu,
+  type AssistantAction,
+} from "@/components/floating-assistant"
+import {
+  type AssistantFeedbackSettings,
+  playAssistantSound,
+  prepareAssistantFeedback,
+  stopAssistantSound,
+  vibrateAssistant,
+} from "@/lib/assistant-feedback"
+import { formatCurrentLocation } from "@/lib/location-display"
+
+const recommendationAreas = [
+  { district: "滨江区", street: "西兴街道" },
+  { district: "西湖区", street: "古荡街道" },
+  { district: "拱墅区", street: "拱宸桥街道" },
+  { district: "上城区", street: "南星街道" },
+]
 
 export function RecommendPage({
   onOpenMessages,
@@ -60,6 +79,12 @@ export function RecommendPage({
   onReleaseAssistant,
   onMoveReleasedAssistant,
   onEndReleasedAssistant,
+  assistantMenuOpen,
+  onToggleAssistantMenu,
+  onCloseAssistantMenu,
+  onSelectAssistant,
+  assistantDraftActions,
+  assistantFeedback,
 }: {
   onOpenMessages: () => void
   onOpenSearch: () => void
@@ -68,9 +93,27 @@ export function RecommendPage({
   campusMode: boolean
   viewerMode: ViewerMode
   assistantDocked: boolean
-  onReleaseAssistant: (pointer: { x: number; y: number; pointerId: number }) => void
-  onMoveReleasedAssistant: (pointer: { x: number; y: number; pointerId: number }) => void
-  onEndReleasedAssistant: (pointer: { x: number; y: number; pointerId: number }) => void
+  onReleaseAssistant: (pointer: {
+    x: number
+    y: number
+    pointerId: number
+  }) => void
+  onMoveReleasedAssistant: (pointer: {
+    x: number
+    y: number
+    pointerId: number
+  }) => void
+  onEndReleasedAssistant: (pointer: {
+    x: number
+    y: number
+    pointerId: number
+  }) => void
+  assistantMenuOpen: boolean
+  onToggleAssistantMenu: () => void
+  onCloseAssistantMenu: () => void
+  onSelectAssistant: (action: AssistantAction) => void
+  assistantDraftActions: AssistantAction[]
+  assistantFeedback: AssistantFeedbackSettings
 }) {
   const [filter, setFilter] = useState("关注")
   const [scanOpen, setScanOpen] = useState(false)
@@ -80,8 +123,10 @@ export function RecommendPage({
   const [recommendFilters, setRecommendFilters] = useState<
     Record<string, string>
   >({})
-  const [city, setCity] = useState("杭州")
-  const [cityOpen, setCityOpen] = useState(false)
+  const [area, setArea] = useState(
+    formatCurrentLocation(recommendationAreas[0])
+  )
+  const [areaOpen, setAreaOpen] = useState(false)
   const [actionItem, setActionItem] = useState<string | null>(null)
   const [reportOpen, setReportOpen] = useState(false)
   const [hiddenIds, setHiddenIds] = useState<string[]>([])
@@ -103,17 +148,91 @@ export function RecommendPage({
   const dockHoldTimerRef = useRef<number | null>(null)
   const dockPointerRef = useRef({ x: 0, y: 0, pointerId: 0 })
   const releasedAssistantRef = useRef(false)
+  const dockClickTimerRef = useRef<number | null>(null)
+  const dockLastPointerDownRef = useRef(0)
+  const skipNextDockClickRef = useRef(false)
+  const dockWrapRef = useRef<HTMLDivElement>(null)
+  const dockVibrationRef = useRef<number | null>(null)
+
+  const stopDockVibration = () => {
+    if (dockVibrationRef.current) {
+      window.clearInterval(dockVibrationRef.current)
+      dockVibrationRef.current = null
+    }
+    stopAssistantSound("hold")
+    vibrateAssistant(0, assistantFeedback.vibrationEnabled)
+  }
+
+  const startDockVibration = () => {
+    stopDockVibration()
+    vibrateAssistant(35, assistantFeedback.vibrationEnabled)
+    dockVibrationRef.current = window.setInterval(() => {
+      vibrateAssistant(35, assistantFeedback.vibrationEnabled)
+    }, 120)
+  }
 
   const clearDockHold = () => {
     if (dockHoldTimerRef.current) window.clearTimeout(dockHoldTimerRef.current)
     dockHoldTimerRef.current = null
     setDockHolding(false)
+    stopDockVibration()
+    stopAssistantSound("hold")
   }
 
-  useEffect(() => () => clearDockHold(), [])
+  useEffect(
+    () => () => {
+      if (dockHoldTimerRef.current)
+        window.clearTimeout(dockHoldTimerRef.current)
+      if (dockVibrationRef.current)
+        window.clearInterval(dockVibrationRef.current)
+      vibrateAssistant(0, assistantFeedback.vibrationEnabled)
+      stopAssistantSound("hold")
+    },
+    [assistantFeedback.vibrationEnabled]
+  )
+
+  useEffect(() => {
+    if (!assistantMenuOpen) return
+    const closeOutsideMenu = (event: globalThis.PointerEvent) => {
+      const target = event.target
+      if (target instanceof Node && !dockWrapRef.current?.contains(target)) {
+        playAssistantSound("menu-close", assistantFeedback.soundEnabled)
+        onCloseAssistantMenu()
+      }
+    }
+    document.addEventListener("pointerdown", closeOutsideMenu)
+    return () => document.removeEventListener("pointerdown", closeOutsideMenu)
+  }, [assistantFeedback.soundEnabled, assistantMenuOpen, onCloseAssistantMenu])
 
   const startDockHold = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (!assistantDocked || dockHoldTimerRef.current) return
+    const now = Date.now()
+    if (now - dockLastPointerDownRef.current <= 320) {
+      if (dockClickTimerRef.current) {
+        window.clearTimeout(dockClickTimerRef.current)
+        dockClickTimerRef.current = null
+      }
+      clearDockHold()
+      onCloseAssistantMenu()
+      skipNextDockClickRef.current = true
+      releasedAssistantRef.current = true
+      playAssistantSound("double", assistantFeedback.soundEnabled)
+      window.setTimeout(() => playAssistantSound("pop", assistantFeedback.soundEnabled), 110)
+      vibrateAssistant(90, assistantFeedback.vibrationEnabled)
+      dockPointerRef.current = {
+        x: event.clientX,
+        y: event.clientY,
+        pointerId: event.pointerId,
+      }
+      event.currentTarget.setPointerCapture(event.pointerId)
+      onReleaseAssistant(dockPointerRef.current)
+      dockLastPointerDownRef.current = 0
+      return
+    }
+    dockLastPointerDownRef.current = now
+    prepareAssistantFeedback()
+    startDockVibration()
+    playAssistantSound("hold", assistantFeedback.soundEnabled)
     dockPointerRef.current = {
       x: event.clientX,
       y: event.clientY,
@@ -125,23 +244,35 @@ export function RecommendPage({
       dockHoldTimerRef.current = null
       setDockHolding(false)
       releasedAssistantRef.current = true
+      skipNextDockClickRef.current = true
+      stopDockVibration()
+      window.setTimeout(() => playAssistantSound("pop", assistantFeedback.soundEnabled), 110)
+      vibrateAssistant(90, assistantFeedback.vibrationEnabled)
       onReleaseAssistant(dockPointerRef.current)
-    }, 3000)
+    }, 2000)
   }
 
-  const moveReleasedAssistant = (event: React.PointerEvent<HTMLButtonElement>) => {
+  const moveReleasedAssistant = (
+    event: React.PointerEvent<HTMLButtonElement>
+  ) => {
     dockPointerRef.current = {
       x: event.clientX,
       y: event.clientY,
       pointerId: event.pointerId,
     }
-    if (releasedAssistantRef.current) onMoveReleasedAssistant(dockPointerRef.current)
+    if (releasedAssistantRef.current)
+      onMoveReleasedAssistant(dockPointerRef.current)
   }
 
   const endDockPointer = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (!releasedAssistantRef.current) {
       clearDockHold()
       return
+    }
+    // 弹出完成后仅停止长按期间的循环震动，不清除刚触发的弹出脉冲。
+    if (dockVibrationRef.current) {
+      window.clearInterval(dockVibrationRef.current)
+      dockVibrationRef.current = null
     }
     releasedAssistantRef.current = false
     onEndReleasedAssistant({
@@ -150,6 +281,32 @@ export function RecommendPage({
       pointerId: event.pointerId,
     })
   }
+
+  const handleDockClick = () => {
+    if (!assistantDocked) return
+    if (skipNextDockClickRef.current) {
+      skipNextDockClickRef.current = false
+      return
+    }
+    if (dockClickTimerRef.current)
+      window.clearTimeout(dockClickTimerRef.current)
+    dockClickTimerRef.current = window.setTimeout(() => {
+      dockClickTimerRef.current = null
+      playAssistantSound(
+        assistantMenuOpen ? "menu-close" : "menu-open",
+        assistantFeedback.soundEnabled
+      )
+      onToggleAssistantMenu()
+    }, 220)
+  }
+
+  useEffect(
+    () => () => {
+      if (dockClickTimerRef.current)
+        window.clearTimeout(dockClickTimerRef.current)
+    },
+    [assistantFeedback.soundEnabled, assistantMenuOpen, onToggleAssistantMenu]
+  )
 
   useEffect(() => {
     const orderViewport = orderViewportRef.current
@@ -212,7 +369,8 @@ export function RecommendPage({
     phoneContent.addEventListener("scroll", collapseHeroAfterScroll, {
       passive: true,
     })
-    return () => phoneContent.removeEventListener("scroll", collapseHeroAfterScroll)
+    return () =>
+      phoneContent.removeEventListener("scroll", collapseHeroAfterScroll)
   }, [])
 
   // 扫描面板负责完整相机生命周期，关闭后立即释放摄像头占用。
@@ -469,46 +627,61 @@ export function RecommendPage({
             星期四 · 8 月 7 日
           </p>
           <div className="mt-1 flex items-center gap-2">
-            <h1 className="text-[27px] font-extrabold tracking-[-0.02em]">
+            <h1 className="text-[1.6875rem] font-extrabold tracking-[-0.02em]">
               趣汇
             </h1>
-            <button
-              type="button"
-              data-assistant-dock
-              className={`assistant-dock-slot ${
-                assistantDocked ? "is-docked" : ""
-              } ${dockHolding ? "is-holding" : ""}`}
-              aria-label={
-                assistantDocked
-                  ? "按住三秒弹出悬浮助手"
-                  : "悬浮助手原型预置位"
-              }
-              title={
-                assistantDocked
-                  ? "按住三秒弹出悬浮助手"
-                  : "拖动悬浮助手到这里并停留三秒"
-              }
-              aria-disabled={!assistantDocked}
-              onPointerDown={startDockHold}
-              onPointerMove={moveReleasedAssistant}
-              onPointerUp={endDockPointer}
-              onPointerLeave={() => {
-                if (!releasedAssistantRef.current) clearDockHold()
-              }}
-              onPointerCancel={() => {
-                if (!releasedAssistantRef.current) clearDockHold()
-              }}
-            >
-              <Sparkles size={16} />
-            </button>
+            <div ref={dockWrapRef} className="assistant-dock-wrap">
+              {assistantDocked && assistantMenuOpen ? (
+                <AssistantMenu
+                  className="assistant-embedded-menu"
+                  draftActions={assistantDraftActions}
+                  onSelect={(action) => {
+                    playAssistantSound("menu-close", assistantFeedback.soundEnabled)
+                    onSelectAssistant(action)
+                  }}
+                />
+              ) : null}
+              <button
+                type="button"
+                data-assistant-dock
+                className={`assistant-dock-slot ${
+                  assistantDocked ? "is-docked" : ""
+                } ${dockHolding ? "is-holding" : ""} ${
+                  assistantMenuOpen ? "is-menu-open" : ""
+                }`}
+                aria-label={
+                  assistantDocked
+                    ? "点击打开菜单，双击或按住两秒弹出悬浮助手"
+                    : "悬浮助手原型预置位"
+                }
+                title={
+                  assistantDocked
+                    ? "点击打开菜单，双击或按住两秒弹出悬浮助手"
+                    : "拖动悬浮助手到这里并停留三秒"
+                }
+                aria-disabled={!assistantDocked}
+                onPointerDown={startDockHold}
+                onPointerMove={moveReleasedAssistant}
+                onPointerUp={endDockPointer}
+                onPointerLeave={() => {
+                  if (!releasedAssistantRef.current) clearDockHold()
+                }}
+                onPointerCancel={() => {
+                  if (!releasedAssistantRef.current) clearDockHold()
+                }}
+                onClick={handleDockClick}
+              >
+                <Sparkles size={16} />
+              </button>
+            </div>
           </div>
           <button
             type="button"
             className="mt-0.5 flex min-h-11 items-center gap-1 text-left text-xs text-muted-foreground"
-            onClick={() => setCityOpen(true)}
+            onClick={() => setAreaOpen(true)}
           >
             <MapPin size={13} className="text-primary" />
-            <span>{city} · 今天一起去做点有趣的事</span>
+            <span>{area} · 今天一起去做点有趣的事</span>
             <ChevronRight size={13} />
           </button>
         </div>
@@ -537,8 +710,7 @@ export function RecommendPage({
               type="button"
               variant="ghost"
               size="sm"
-              className="h-5 gap-0.5 px-1 text-[9px] font-medium text-primary"
-              style={{ fontSize: 9 }}
+              className="h-5 gap-0.5 px-1 text-[0.5625rem] font-medium text-primary"
               onClick={onOpenMessages}
             >
               查看全部 <ChevronRight size={11} />
@@ -546,7 +718,7 @@ export function RecommendPage({
           </div>
           <div
             ref={orderViewportRef}
-            className="hide-scrollbar h-[92px] snap-y snap-mandatory overflow-y-auto overscroll-contain"
+            className="hide-scrollbar aspect-[4/1] snap-y snap-mandatory overflow-y-auto overscroll-contain"
             aria-label="订单状态，可上下滚动，每次显示三条"
             aria-live="off"
             tabIndex={0}
@@ -558,7 +730,7 @@ export function RecommendPage({
             {[0, 1, 0].map((groupIndex, copyIndex) => (
               <div
                 key={`${groupIndex}-${copyIndex}`}
-                className="h-[92px] snap-start space-y-1"
+                className="aspect-[4/1] snap-start space-y-1"
               >
                 {[0, 1, 2].map((offset) => {
                   const item = orderUpdates[groupIndex * 3 + offset]
@@ -585,10 +757,10 @@ export function RecommendPage({
                       >
                         <Icon size={12} />
                       </span>
-                      <span className="min-w-0 flex-1 truncate text-[10px] font-semibold">
+                      <span className="min-w-0 flex-1 truncate text-[0.625rem] font-semibold">
                         {item.title}
                       </span>
-                      <span className="shrink-0 text-[9px] text-muted-foreground">
+                      <span className="shrink-0 text-[0.5625rem] text-muted-foreground">
                         {item.meta}
                       </span>
                     </button>
@@ -610,7 +782,7 @@ export function RecommendPage({
             今日首推已收起 <ChevronRight size={15} />
           </button>
         ) : (
-          <Card className="mb-4 h-[160px] gap-0 rounded-none border-0 bg-transparent py-0 shadow-none">
+          <Card className="mb-4 aspect-[25/12] gap-0 rounded-none border-0 bg-transparent py-0 shadow-none">
             <div
               className="relative flex h-full min-h-0"
               role="button"
@@ -624,22 +796,26 @@ export function RecommendPage({
               }}
             >
               <div className="h-full w-[38.2%] shrink-0 overflow-hidden bg-muted">
-                <img className="image-cover" src={imageUrls.hike} alt="径山徒步活动" />
+                <img
+                  className="image-cover"
+                  src={imageUrls.hike}
+                  alt="径山徒步活动"
+                />
               </div>
-              <div className="flex min-w-0 flex-1 flex-col rounded-r-xl border-y border-r border-border/70 bg-white py-3 pr-3 pl-3">
-                <div className="flex items-center gap-2 text-xs">
+              <div className="flex min-w-0 flex-1 flex-col rounded-r-xl border-y border-r border-border/70 bg-white py-3.5 pr-4 pl-3.5">
+                <div className="flex items-center gap-2.5 text-xs">
                   <p className="font-extrabold text-primary">今日首推</p>
                   <span className="flex items-center gap-1 text-muted-foreground">
                     <MapPin size={12} /> 距离你 2.8 km
                   </span>
                 </div>
-                <h2 className="mt-1 line-clamp-2 text-[17px] leading-tight font-extrabold">
+                <h2 className="mt-1.5 line-clamp-2 text-[1.0625rem] leading-tight font-extrabold">
                   周日径山轻徒步
                 </h2>
-                <p className="mt-1 text-xs font-semibold text-primary">
+                <p className="mt-1.5 text-xs font-semibold text-primary">
                   还差 2 位同行者
                 </p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
                   周日 08:30 集合 · 人均约 ¥68
                 </p>
                 <p className="text-xs leading-5 text-muted-foreground">
@@ -706,8 +882,8 @@ export function RecommendPage({
       <div className="mb-3 flex items-center justify-between">
         <div>
           <h2 className="section-title">{currentCategory.title}</h2>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            {currentCategory.description} · {city}
+          <p className="mt-1 text-[0.6875rem] text-muted-foreground">
+            {currentCategory.description} · {area}
           </p>
         </div>
         <Button
@@ -722,7 +898,7 @@ export function RecommendPage({
           {refreshing ? "更新中" : "刷新推荐"}
         </Button>
       </div>
-      <div className="mb-3 flex min-h-9 items-center justify-between border-y border-border/70 py-2 text-[11px] text-muted-foreground">
+      <div className="mb-3 flex min-h-9 items-center justify-between border-y border-border/70 py-2 text-[0.6875rem] text-muted-foreground">
         <span>{filteredItems.length} 条匹配内容</span>
         <button
           type="button"
@@ -757,7 +933,7 @@ export function RecommendPage({
                       }
                     }}
                   >
-                    <div className="h-[92px] w-[88px] shrink-0 overflow-hidden rounded-lg bg-muted">
+                    <div className="w-[28%] shrink-0 aspect-[22/23] overflow-hidden rounded-lg bg-muted">
                       <img
                         className="image-cover"
                         src={item.activity.image}
@@ -767,13 +943,13 @@ export function RecommendPage({
                     <div className="min-w-0 flex-1 py-0.5">
                       <div className="mb-1 flex items-center justify-between gap-2">
                         <Badge
-                          className={`border-0 px-2 py-0.5 text-[10px] ${toneClass}`}
+                          className={`border-0 px-2 py-0.5 text-[0.625rem] ${toneClass}`}
                           variant="outline"
                         >
                           {categoryLabel}
                         </Badge>
                         <div className="flex items-center gap-1">
-                          <span className="text-[11px] text-muted-foreground">
+                          <span className="text-[0.6875rem] text-muted-foreground">
                             {item.reason}
                           </span>
                           <Button
@@ -797,7 +973,7 @@ export function RecommendPage({
                         {item.activity.detail}
                       </p>
                       {viewerMode === "guest" ? (
-                        <p className="mt-3 truncate text-[11px] text-muted-foreground">
+                        <p className="mt-3 truncate text-[0.6875rem] text-muted-foreground">
                           描述：
                           {(
                             item.activity.description ?? item.activity.detail
@@ -809,7 +985,7 @@ export function RecommendPage({
                             value={item.activity.progress}
                             className="h-1.5 flex-1"
                           />
-                          <span className="text-[11px] font-semibold whitespace-nowrap text-[var(--qh-coral)]">
+                          <span className="text-[0.6875rem] font-semibold whitespace-nowrap text-[var(--qh-coral)]">
                             {participantSummary(item.activity)}
                           </span>
                         </div>
@@ -865,7 +1041,7 @@ export function RecommendPage({
                       }
                     }}
                   >
-                    <div className="relative size-[92px] shrink-0 overflow-hidden rounded-lg bg-muted">
+                    <div className="relative w-[29%] shrink-0 aspect-square overflow-hidden rounded-lg bg-muted">
                       <img
                         className="image-cover"
                         src={item.product.image}
@@ -875,7 +1051,7 @@ export function RecommendPage({
                     <div className="min-w-0 flex-1 py-0.5">
                       <div className="mb-1 flex items-center justify-between gap-2">
                         <Badge
-                          className="border-0 bg-[#fff5d9] px-2 py-0.5 text-[10px] text-[#77551c]"
+                          className="border-0 bg-[#fff5d9] px-2 py-0.5 text-[0.625rem] text-[#77551c]"
                           variant="outline"
                         >
                           趣汇自营 · {item.product.tag}
@@ -1010,7 +1186,7 @@ export function RecommendPage({
       <Sheet open={recommendFilterOpen} onOpenChange={setRecommendFilterOpen}>
         <SheetContent
           side="right"
-          className="w-[min(92vw,380px)] overflow-y-auto p-0"
+          className="w-[min(92vw,24rem)] overflow-y-auto p-0"
         >
           <SheetHeader className="border-b border-border/70 px-4 py-4">
             <SheetTitle>{filter}筛选</SheetTitle>
@@ -1067,7 +1243,7 @@ export function RecommendPage({
                         event.target.value
                       )
                     }
-                    placeholder="收货地点，例如：城西"
+                    placeholder="收货地点，例如：西兴街道"
                   />
                 </div>
               </>
@@ -1235,40 +1411,43 @@ export function RecommendPage({
         </SheetContent>
       </Sheet>
 
-      <Sheet open={cityOpen} onOpenChange={setCityOpen}>
+      <Sheet open={areaOpen} onOpenChange={setAreaOpen}>
         <SheetContent side="bottom" className="max-h-[70svh] rounded-t-2xl">
           <SheetHeader>
-            <SheetTitle>切换推荐城市</SheetTitle>
+            <SheetTitle>切换推荐范围</SheetTitle>
             <SheetDescription>
-              附近内容会根据城市更新，关注内容不受影响。
+              当前定位优先显示市区；缺失市区时才显示街道，关注内容不受影响。
             </SheetDescription>
           </SheetHeader>
           <div className="mt-4 grid gap-2">
-            {["杭州", "上海", "宁波", "苏州"].map((item) => (
-              <Button
-                key={item}
-                type="button"
-                variant={item === city ? "secondary" : "outline"}
-                className="justify-between"
-                onClick={() => {
-                  setCity(item)
-                  setCityOpen(false)
-                  showToast(`已切换到${item}`)
-                }}
-              >
-                {item}
-                {item === city ? (
-                  <CheckCheck size={16} />
-                ) : (
-                  <ChevronRight size={16} />
-                )}
-              </Button>
-            ))}
+            {recommendationAreas.map((location) => {
+              const item = formatCurrentLocation(location)
+              return (
+                <Button
+                  key={item}
+                  type="button"
+                  variant={item === area ? "secondary" : "outline"}
+                  className="justify-between"
+                  onClick={() => {
+                    setArea(item)
+                    setAreaOpen(false)
+                    showToast(`已切换到${item}`)
+                  }}
+                >
+                  {item}
+                  {item === area ? (
+                    <CheckCheck size={16} />
+                  ) : (
+                    <ChevronRight size={16} />
+                  )}
+                </Button>
+              )
+            })}
             <Button
               type="button"
               variant="ghost"
               className="justify-start text-primary"
-              onClick={() => showToast("定位权限未开启，可手动选择城市")}
+              onClick={() => showToast("定位权限未开启，可手动选择附近区域")}
             >
               <MapPin size={16} /> 重新定位
             </Button>

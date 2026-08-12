@@ -91,15 +91,15 @@ export function MallPage({
         />
       </div>
       <Card className="mb-5 overflow-hidden border-0 bg-[#e9efe7] shadow-none">
-        <div className="grid min-h-[150px] grid-cols-[1.12fr_0.88fr]">
+        <div className="grid aspect-[7/3] grid-cols-[1.12fr_0.88fr]">
           <div className="flex flex-col justify-center p-4">
             <Badge
-              className="mb-2 w-fit border-0 bg-white/80 text-[10px] text-primary"
+              className="mb-2 w-fit border-0 bg-white/80 text-[0.625rem] text-primary"
               variant="outline"
             >
               <Sparkles size={12} /> 本周上新
             </Badge>
-            <h2 className="text-[19px] leading-tight font-extrabold">
+            <h2 className="text-[1.1875rem] leading-tight font-extrabold">
               把周末装进
               <br />
               一只轻行包
@@ -158,7 +158,7 @@ export function MallPage({
           />
         ))}
       </div>
-      <div className="mt-5 flex items-center justify-center gap-4 text-[11px] text-muted-foreground">
+      <div className="mt-5 flex items-center justify-center gap-4 text-[0.6875rem] text-muted-foreground">
         <span className="flex items-center gap-1">
           <ShieldCheck size={13} className="text-primary" /> 正品保障
         </span>
@@ -172,7 +172,7 @@ export function MallPage({
       <Sheet open={mallFilterOpen} onOpenChange={setMallFilterOpen}>
         <SheetContent
           side="right"
-          className="w-[min(92vw,380px)] overflow-y-auto p-0"
+          className="w-[min(92vw,24rem)] overflow-y-auto p-0"
         >
           <SheetHeader>
             <SheetTitle>商城筛选</SheetTitle>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react"
+import { useEffect, useRef, useState, type PointerEvent } from "react"
 import {
   ArrowLeft,
   Check,
@@ -21,6 +21,12 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import type { AssistantAction } from "@/components/floating-assistant"
+import { formatCurrentLocation } from "@/lib/location-display"
+import {
+  getPostDraftFieldLabel,
+  getPostDraftFields,
+} from "@/prototype/post-schema"
+import type { ActivityType } from "@/prototype/data"
 
 type DraftFields = Record<string, string>
 export type CreateType =
@@ -46,7 +52,13 @@ const options: Record<Exclude<AssistantAction, "service">, CreateType[]> = {
 }
 
 const posters = ["#dbece4", "#dfeafb", "#f7e3cf", "#f5e2e8"]
-const requiredFields = ["主题", "时间", "地点或线上方式", "人数规则", "费用或报酬"]
+
+function postTypeFor(createType: CreateType | null): ActivityType | null {
+  if (createType === "普通求助" || createType === "紧急求助") {
+    return "近邻互助"
+  }
+  return createType
+}
 
 function guidanceFor(type: CreateType) {
   const copy: Record<CreateType, string> = {
@@ -87,6 +99,7 @@ export function AssistantChatPage({
   const [streaming, setStreaming] = useState(false)
   const [round, setRound] = useState(Object.keys(initialDraft?.form ?? {}).length ? 1 : 0)
   const [manualFields, setManualFields] = useState<string[]>([])
+  const [manualAdvancedOpen, setManualAdvancedOpen] = useState(false)
   const [candidates, setCandidates] = useState<DraftFields>({})
   const [images, setImages] = useState<string[]>([])
   const [recording, setRecording] = useState(false)
@@ -96,10 +109,15 @@ export function AssistantChatPage({
   const streamTimers = useRef<number[]>([])
   const recordStart = useRef<number | null>(null)
   const isService = action === "service"
-  const missing = useMemo(
-    () => requiredFields.filter((field) => !draft[field]),
-    [draft]
+  const postType = postTypeFor(createType)
+  const schemaFields = postType ? getPostDraftFields(postType) : []
+  const requiredFields = schemaFields.filter(
+    (field) => field.required && !field.defaulted
   )
+  const advancedFields = schemaFields.filter((field) => field.advanced)
+  const fieldLabel = (field: string) =>
+    postType ? getPostDraftFieldLabel(postType, field) : field
+  const missing = requiredFields.filter((field) => !draft[field.key]?.trim())
   const completed = !isService && createType !== null && missing.length === 0
 
   useEffect(() => {
@@ -115,6 +133,7 @@ export function AssistantChatPage({
   const chooseType = (type: CreateType) => {
     setDirty(true)
     setCreateType(type)
+    setManualAdvancedOpen(false)
     setMessages((items) => [...items, `已选择：${type}`, guidanceFor(type)])
   }
 
@@ -124,6 +143,7 @@ export function AssistantChatPage({
     setDraft({})
     setCandidates({})
     setManualFields([])
+    setManualAdvancedOpen(false)
     setRound(0)
     setMessages((items) => [...items, "已返回类型选择，请重新选择帖子类型。"])
   }
@@ -143,17 +163,76 @@ export function AssistantChatPage({
     }
 
     setStreaming(true)
-    const force = /改|改成|改为|换成/.test(message) ? ["时间"] : []
-    const patches = round === 0
-      ? [
-          ["主题", createType === "拼车" ? "周五晚虹桥至苏州拼车" : createType === "线上开黑" ? "周末双排组队" : createType?.includes("求助") ? "临时求助" : "周末一起发起"],
-          ["时间", force.length ? "周六 19:00" : "本周六 14:00"],
-          ["地点或线上方式", createType === "线上开黑" ? "线上语音房" : "虹桥附近"],
-        ]
-      : [
-          ["人数规则", "2 人起，最多 4 人"],
-          ["费用或报酬", createType?.includes("求助") ? "50 元" : "每人约 80 元"],
-        ]
+    const force = /改|改成|改为|换成/.test(message)
+      ? ["primaryOccursAt"]
+      : []
+    const district = formatCurrentLocation({
+      district: "滨江区",
+      street: "西兴街道",
+    })
+    const firstRoundPatches: Record<ActivityType, Array<[string, string]>> = {
+      拼单: [
+        ["title", "周末山姆零食拼单"],
+        ["primaryOccursAt", force.length ? "2026-08-15T19:00" : "2026-08-16T18:00"],
+        ["productName", "山姆零食组合包"],
+      ],
+      拼车: [
+        ["title", "周五晚机场至西兴街道拼车"],
+        ["primaryOccursAt", force.length ? "2026-08-14T19:00" : "2026-08-14T19:30"],
+        ["originName", "萧山机场"],
+        ["destinationName", district],
+      ],
+      线下组队: [
+        ["title", "周末安吉露营组队"],
+        ["primaryOccursAt", force.length ? "2026-08-15T09:00" : "2026-08-16T07:30"],
+        ["activityCategory", "露营 + 轻徒步"],
+        ["destinationName", "安吉竹海营地"],
+      ],
+      线上开黑: [
+        ["title", "周末双排组队"],
+        ["primaryOccursAt", force.length ? "2026-08-15T19:00" : "2026-08-16T20:00"],
+        ["gameCategory", "MOBA"],
+        ["gameName", "王者荣耀"],
+      ],
+      近邻互助: [
+        ["title", "明天下午借羽毛球拍"],
+        ["primaryOccursAt", force.length ? "2026-08-15T14:00" : "2026-08-14T14:00"],
+        ["helpCategory", "借用"],
+        ["content", "借一副基础羽毛球拍，课后当天归还"],
+      ],
+    }
+    const secondRoundPatches: Record<ActivityType, Array<[string, string]>> = {
+      拼单: [
+        ["estimatedUnitAmountCent", "86"],
+        ["targetQuantity", "5"],
+        ["fulfillmentMode", "周六 18:00 后自提"],
+      ],
+      拼车: [
+        ["minParticipants", "2"],
+        ["maxParticipants", "4"],
+        ["fareMode", "AA"],
+      ],
+      线下组队: [
+        ["minParticipants", "2"],
+        ["maxParticipants", "8"],
+      ],
+      线上开黑: [
+        ["platform", "微信区 · 语音房"],
+        ["durationMinutes", "120"],
+        ["minParticipants", "3"],
+        ["maxParticipants", "5"],
+      ],
+      近邻互助: [
+        ["timeliness", "时段"],
+        ["neededWindow", "明日 14:00-16:00"],
+        ["latestResponseAt", "明日 10:00 前"],
+      ],
+    }
+    const patches = postType
+      ? round === 0
+        ? firstRoundPatches[postType]
+        : secondRoundPatches[postType]
+      : []
 
     patches.forEach(([field, value], index) => {
       streamTimers.current.push(
@@ -172,7 +251,7 @@ export function AssistantChatPage({
               force.length
                 ? "已根据你的明确修改更新对应字段。"
                 : round === 0
-                  ? "我已回填可识别的信息。请补充人数规则和费用或报酬。"
+                  ? "我已回填可识别的信息。继续发送一条消息，我会补齐该类型的必要字段。"
                   : "必填信息已整理完成。请预览帖子，再补充图片或手动调整。",
             ])
           }
@@ -244,7 +323,7 @@ export function AssistantChatPage({
     })
   }
 
-  const title = draft["主题"] || createType || "趣汇新帖子"
+  const title = draft.title || createType || "趣汇新帖子"
   const posterIndex = [...title].reduce((sum, char) => sum + char.charCodeAt(0), 0) % posters.length
 
   return (
@@ -253,15 +332,15 @@ export function AssistantChatPage({
         <Button type="button" variant="ghost" size="icon" aria-label="返回" onClick={leave}>
           <ArrowLeft />
         </Button>
-        {!isService ? (
-          <Button type="button" variant="ghost" size="sm" onClick={() => setManual((value) => !value)}>
-            {manual ? "继续对话" : "手动填写"}
-          </Button>
-        ) : null}
         <div className="min-w-0 flex-1">
           <p className="text-xs text-muted-foreground">趣汇助手</p>
           <h1 className="truncate text-base font-bold">{actionTitle[action]}</h1>
         </div>
+        {!isService ? (
+          <Button type="button" variant="ghost" size="sm" className="shrink-0" onClick={() => setManual((value) => !value)}>
+            {manual ? "继续对话" : "手动填写"}
+          </Button>
+        ) : null}
         {isService ? <Headphones className="mr-2 text-primary" size={21} /> : null}
       </header>
 
@@ -277,7 +356,44 @@ export function AssistantChatPage({
             <input id="assistant-images" className="sr-only" type="file" multiple accept="image/*" onChange={(event) => { setDirty(true); setImages(Array.from(event.target.files ?? []).map((file) => file.name)) }} />
           </div>
           <p className="mb-3 text-xs text-muted-foreground">第一张图片自动作为帖子封面；未上传时使用随机封面。</p>
-          {requiredFields.map((field) => <Input key={field} className="mb-2" value={draft[field] ?? ""} placeholder={field} onChange={(event) => updateManualField(field, event.target.value)} />)}
+          <div className="space-y-3">
+            {requiredFields.map((field) => (
+              <label key={field.key} className="block space-y-1.5">
+                <span className="text-xs font-semibold">
+                  {field.label} <span className="text-[var(--qh-coral)]">*</span>
+                </span>
+                <Input
+                  type={field.inputType}
+                  value={draft[field.key] ?? ""}
+                  placeholder={field.placeholder}
+                  onChange={(event) => updateManualField(field.key, event.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+          <p className="mt-3 text-[0.6875rem] text-muted-foreground">默认仅展示市区；报名或响应截止会按主时间自动预填。</p>
+          {advancedFields.length ? (
+            <>
+              <Button type="button" variant="ghost" size="sm" className="mt-2 w-full justify-start text-primary" onClick={() => setManualAdvancedOpen((open) => !open)}>
+                {manualAdvancedOpen ? "收起更多说明" : "更多说明（可选）"}
+              </Button>
+              {manualAdvancedOpen ? (
+                <div className="mt-2 space-y-3 rounded-lg bg-muted p-3">
+                  {advancedFields.map((field) => (
+                    <label key={field.key} className="block space-y-1.5">
+                      <span className="text-xs font-semibold">{field.label}</span>
+                      <Input
+                        type={field.inputType}
+                        value={draft[field.key] ?? ""}
+                        placeholder={field.placeholder}
+                        onChange={(event) => updateManualField(field.key, event.target.value)}
+                      />
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+            </>
+          ) : null}
         </section>
       ) : (
         <section className="assistant-chat-scroll" aria-live="polite">
@@ -294,10 +410,10 @@ export function AssistantChatPage({
           {!isService && Object.keys(draft).length ? (
             <Card className="assistant-draft-card">
               <CardContent className="p-3">
-                <div className="mb-2 flex items-center justify-between gap-2"><span className="flex items-center gap-1 text-xs font-bold"><Sparkles size={14} className="text-primary" />{streaming ? "正在回填草稿" : "建帖草稿"}</span><span className="text-[11px] text-muted-foreground">{`{ form, force }`}</span></div>
-                {Object.entries(draft).map(([field, value]) => <div className="assistant-draft-field" key={field}><span>{field}</span><strong>{value}</strong></div>)}
-                {Object.entries(candidates).map(([field, value]) => <div className="assistant-candidate" key={field}><span>{field} 建议改为“{value}”</span><Button type="button" size="xs" onClick={() => adoptCandidate(field)}>采用</Button></div>)}
-                {missing.length ? <p className="mt-2 text-xs text-[var(--qh-coral)]">待补充：{missing.slice(0, 2).join("、")}</p> : <p className="mt-2 flex items-center gap-1 text-xs text-primary"><Check size={14} />必填信息已齐全</p>}
+                <div className="mb-2 flex items-center justify-between gap-2"><span className="flex items-center gap-1 text-xs font-bold"><Sparkles size={14} className="text-primary" />{streaming ? "正在回填草稿" : "建帖草稿"}</span><span className="text-[0.6875rem] text-muted-foreground">{`{ form, force }`}</span></div>
+                {Object.entries(draft).map(([field, value]) => <div className="assistant-draft-field" key={field}><span>{fieldLabel(field)}</span><strong>{value}</strong></div>)}
+                {Object.entries(candidates).map(([field, value]) => <div className="assistant-candidate" key={field}><span>{fieldLabel(field)} 建议改为“{value}”</span><Button type="button" size="xs" onClick={() => adoptCandidate(field)}>采用</Button></div>)}
+                {missing.length ? <p className="mt-2 text-xs text-[var(--qh-coral)]">待补充：{missing.slice(0, 2).map((field) => field.label).join("、")}</p> : <p className="mt-2 flex items-center gap-1 text-xs text-primary"><Check size={14} />必填信息已齐全</p>}
               </CardContent>
             </Card>
           ) : null}

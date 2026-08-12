@@ -129,7 +129,7 @@ export function SearchPage({
               <h2 className="section-title text-base">大家都在搜</h2>
               <Badge
                 variant="outline"
-                className="border-0 bg-secondary text-[10px] text-primary"
+                className="border-0 bg-secondary text-[0.625rem] text-primary"
               >
                 <Sparkles size={12} /> 热门
               </Badge>
@@ -214,7 +214,7 @@ export function SearchPage({
                   }}
                 >
                   <div className="flex gap-3 p-3">
-                    <div className="size-[76px] shrink-0 overflow-hidden rounded-lg bg-muted">
+                    <div className="w-[24%] shrink-0 aspect-square overflow-hidden rounded-lg bg-muted">
                       <img
                         className="image-cover"
                         src={activity.image}
@@ -224,7 +224,7 @@ export function SearchPage({
                     <div className="min-w-0 flex-1">
                       <Badge
                         variant="outline"
-                        className="border-0 bg-secondary text-[10px] text-primary"
+                        className="border-0 bg-secondary text-[0.625rem] text-primary"
                       >
                         {activity.type}
                       </Badge>
@@ -234,7 +234,7 @@ export function SearchPage({
                       <p className="mt-1 truncate text-xs text-muted-foreground">
                         {activity.detail}
                       </p>
-                      <p className="mt-2 text-[11px] font-semibold text-[var(--qh-coral)]">
+                      <p className="mt-2 text-[0.6875rem] font-semibold text-[var(--qh-coral)]">
                         {participantSummary(activity)} · {activity.distance}
                       </p>
                     </div>
@@ -266,7 +266,7 @@ export function SearchPage({
                   }}
                 >
                   <div className="flex gap-3 p-3">
-                    <div className="size-[76px] shrink-0 overflow-hidden rounded-lg bg-muted">
+                    <div className="w-[24%] shrink-0 aspect-square overflow-hidden rounded-lg bg-muted">
                       <img
                         className="image-cover"
                         src={product.image}
@@ -276,7 +276,7 @@ export function SearchPage({
                     <div className="min-w-0 flex-1">
                       <Badge
                         variant="outline"
-                        className="border-0 bg-[var(--qh-yellow-soft)] text-[10px] text-[#77551c]"
+                        className="border-0 bg-[var(--qh-yellow-soft)] text-[0.625rem] text-[#77551c]"
                       >
                         趣汇自营 · {product.tag}
                       </Badge>

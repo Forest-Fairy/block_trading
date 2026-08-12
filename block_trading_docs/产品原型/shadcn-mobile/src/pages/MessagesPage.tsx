@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   ArrowLeft,
   Bell,
@@ -140,12 +140,12 @@ function NotificationList({
                   <h2 className="text-sm font-bold">{item.title}</h2>
                   <Badge
                     variant="outline"
-                    className="border-0 bg-secondary text-[10px] text-primary"
+                    className="border-0 bg-secondary text-[0.625rem] text-primary"
                   >
                     {item.tag}
                   </Badge>
                 </div>
-                <p className="mt-1 text-[11px] text-muted-foreground">
+                <p className="mt-1 text-[0.6875rem] text-muted-foreground">
                   {item.time}
                 </p>
               </div>
@@ -229,11 +229,17 @@ function ChatView({
           </IconButton>
         }
       />
-      <div className="mb-3 flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+      <div
+        className={`mb-2 flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[0.6875rem] ${
+          isGroup
+            ? "bg-muted text-muted-foreground"
+            : "border border-amber-200 bg-amber-50 text-amber-800"
+        }`}
+      >
         {isGroup ? (
           <UsersRound size={14} className="text-primary" />
         ) : (
-          <Info size={14} className="text-primary" />
+          <Info size={14} className="text-amber-500" />
         )}
         {isGroup
           ? `${conversation.detail} · 仅活动成员可见`
@@ -241,7 +247,7 @@ function ChatView({
       </div>
       <div className="flex-1 space-y-3 pb-4">
         <div className="flex justify-center">
-          <span className="rounded-full bg-muted px-3 py-1 text-[10px] text-muted-foreground">
+          <span className="rounded-full bg-muted px-3 py-1 text-[0.625rem] text-muted-foreground">
             今天
           </span>
         </div>
@@ -264,7 +270,7 @@ function ChatView({
         </div>
         {isGroup ? (
           <div className="flex justify-center">
-            <span className="rounded-lg bg-secondary px-3 py-2 text-[11px] text-primary">
+            <span className="rounded-lg bg-secondary px-3 py-2 text-[0.6875rem] text-primary">
               系统提示：活动地点仅对已确认成员可见
             </span>
           </div>
@@ -308,13 +314,20 @@ function ChatView({
 export function MessagesPage({
   onRead,
   onOpenPostDetail,
+  onChatOpenChange,
 }: {
   onRead: () => void
   onOpenPostDetail: (activityId: string) => void
+  onChatOpenChange: (open: boolean) => void
 }) {
   const [active, setActive] = useState("全部")
   const [view, setView] = useState<MessageView>("inbox")
   const [conversationId, setConversationId] = useState("lin")
+
+  useEffect(() => {
+    onChatOpenChange(view === "chat")
+    return () => onChatOpenChange(false)
+  }, [onChatOpenChange, view])
 
   if (view === "chat")
     return (
@@ -373,7 +386,7 @@ export function MessagesPage({
               </span>
             </span>
             <Badge
-              className="border-0 bg-[var(--qh-coral)] text-[10px] text-white"
+              className="border-0 bg-[var(--qh-coral)] text-[0.625rem] text-white"
               variant="outline"
             >
               3
@@ -395,7 +408,7 @@ export function MessagesPage({
               </span>
             </span>
             <Badge
-              className="border-0 bg-[var(--qh-coral)] text-[10px] text-white"
+              className="border-0 bg-[var(--qh-coral)] text-[0.625rem] text-white"
               variant="outline"
             >
               5
@@ -429,9 +442,9 @@ export function MessagesPage({
           <span className="section-title text-base">用户消息</span>
           <Separator className="flex-1" />
         </div>
-        <Card size="sm" className="border-0 bg-muted shadow-none">
-          <CardContent className="flex items-center gap-3 p-3 text-xs text-muted-foreground">
-            <Info size={16} className="shrink-0 text-primary" />
+        <Card size="sm" className="border-0 bg-amber-50 shadow-none">
+          <CardContent className="flex items-center gap-2 px-2.5 py-1.5 text-xs text-amber-800">
+            <Info size={15} className="shrink-0 text-amber-500" />
             <span>陌生人消息可以在“我的 · 隐私设置”中关闭。</span>
           </CardContent>
         </Card>
@@ -455,14 +468,14 @@ export function MessagesPage({
             <span className="min-w-0 flex-1">
               <span className="flex items-center justify-between gap-2">
                 <strong className="text-sm">{message.title}</strong>
-                <span className="text-[10px] text-muted-foreground">
+                <span className="text-[0.625rem] text-muted-foreground">
                   {message.time}
                 </span>
               </span>
               <span className="mt-1 block truncate text-xs text-muted-foreground">
                 {message.desc}
               </span>
-              <span className="mt-1 block text-[10px] text-primary">
+              <span className="mt-1 block text-[0.625rem] text-primary">
                 {message.kind} · {message.detail}
               </span>
             </span>

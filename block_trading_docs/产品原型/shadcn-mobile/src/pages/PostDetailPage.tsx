@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/sheet"
 import {
   activities,
+  getActivityDetailFields,
   participantSummary,
   type ActivityType,
   type ViewerMode,
@@ -46,61 +47,30 @@ import { IconButton, PageHeader } from "@/components/prototype-shell"
 
 const typeMeta: Record<
   ActivityType,
-  { summary: string; fields: Array<[string, string]>; description: string }
+  { summary: string; description: string }
 > = {
   拼单: {
     summary: "一起买更划算，按截止时间完成收货",
-    fields: [
-      ["商品与规格", "山姆零食组合包 · 12 件装"],
-      ["预估人均", "¥ 86 / 人"],
-      ["收货地点", "滨江 · 星耀城北门"],
-      ["交付方式", "周六 18:00 后自提"],
-    ],
     description:
       "发起人已整理好商品清单，大家确认规格后统一下单。成团后会在群聊同步订单和自提提醒。",
   },
   拼车: {
     summary: "同行路线与时间匹配，座位按上限管理",
-    fields: [
-      ["路线", "萧山机场 → 城西"],
-      ["上车地点", "机场 T3 到达层 6 号门"],
-      ["出行时间", "周五 19:30"],
-      ["费用方式", "预计 ¥ 45 / 人 · AA"],
-    ],
     description:
       "行程确认后仅向已确认成员开放精确联系方式。请提前说明行李数量，临时变更需要在群聊中同步。",
   },
   线下组队: {
     summary: "线下活动先确认集合信息，再申请加入",
-    fields: [
-      ["目的地", "安吉 · 竹海营地"],
-      ["集合时间", "周六 07:30"],
-      ["人均消费", "约 ¥ 188 / 人"],
-      ["参与要求", "自备徒步鞋，接受拼房"],
-    ],
     description:
       "本次活动包含轻徒步和露营，费用按实际 AA。发起人会在出发前一天确认天气和装备清单。",
   },
   线上开黑: {
     summary: "线上开黑按最少与最多人数动态成队",
-    fields: [
-      ["游戏类目", "MOBA · 王者荣耀"],
-      ["平台", "微信区 · 语音房"],
-      ["开始时间", "今晚 20:00"],
-      ["活动时长", "预计 2 小时"],
-    ],
     description:
       "达到最少人数即可开局，达到最多人数后停止招募。入队后请提前 5 分钟进语音房，临时缺席可在群聊说明。",
   },
   近邻互助: {
     summary: "附近临时求助，按最晚响应时间完成匹配",
-    fields: [
-      ["报酬", "¥ 20"],
-      ["需求时效性", "时段"],
-      ["需求时间", "明日 14:00-16:00"],
-      ["最晚响应", "明日 10:00 前"],
-      ["是否加急", "普通求助"],
-    ],
     description:
       "明天下午有羽毛球课，临时没有球拍。希望借到一副基础球拍，课后当天归还，可支付清洁和借用报酬。",
   },
@@ -313,6 +283,7 @@ export function PostDetailPage({
   const galleryAutoPausedRef = useRef(false)
   const galleryPauseTimerRef = useRef<number | null>(null)
   const meta = typeMeta[activity.type]
+  const detailFields = getActivityDetailFields(activity)
   const isGuest = viewerMode === "guest"
   const activityDescription = activity.description ?? meta.description
   const gallery = [activity.image, ...activityImageSets[activity.type]].filter(
@@ -449,7 +420,7 @@ export function PostDetailPage({
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs font-semibold">{reply.author}</span>
             <span className="flex items-center gap-1">
-              <span className="text-[10px] text-muted-foreground">
+              <span className="text-[0.625rem] text-muted-foreground">
                 {reply.time}
               </span>
               <Button
@@ -468,7 +439,7 @@ export function PostDetailPage({
           </p>
           <button
             type="button"
-            className="mt-1 text-[10px] font-semibold text-primary"
+            className="mt-1 text-[0.625rem] font-semibold text-primary"
             onClick={() => showToast(`正在回复${reply.author}`)}
           >
             回复
@@ -591,14 +562,14 @@ export function PostDetailPage({
           <div className="absolute inset-x-3 bottom-3 z-20 flex items-center justify-between gap-2">
             {!isGuest ? (
               <Badge
-                className="border-0 bg-black/55 text-[10px] text-white"
+                className="border-0 bg-black/55 text-[0.625rem] text-white"
                 variant="outline"
               >
                 {campusMode ? "仅同校可见" : "公开可见"}
               </Badge>
             ) : null}
             {!isGuest ? (
-              <span className="rounded-full bg-black/55 px-2 py-1 text-[10px] text-white">
+              <span className="rounded-full bg-black/55 px-2 py-1 text-[0.625rem] text-white">
                 {activeImageIndex + 1} / {gallery.length}
               </span>
             ) : null}
@@ -634,7 +605,7 @@ export function PostDetailPage({
                   <strong className="block text-sm text-primary">
                     {activity.distance}
                   </strong>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-[0.625rem] text-muted-foreground">
                     距离
                   </span>
                 </div>
@@ -642,7 +613,7 @@ export function PostDetailPage({
                   <strong className="block text-sm text-primary">
                     {commentCount}
                   </strong>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-[0.625rem] text-muted-foreground">
                     留言数
                   </span>
                 </div>
@@ -650,7 +621,7 @@ export function PostDetailPage({
                   <strong className="block text-sm text-primary">
                     {commentCount + replyCount}
                   </strong>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-[0.625rem] text-muted-foreground">
                     评论数
                   </span>
                 </div>
@@ -703,7 +674,7 @@ export function PostDetailPage({
                     </span>
                   </div>
                   <Progress value={activity.progress} className="mt-3 h-2" />
-                  <p className="mt-2 text-[11px] text-muted-foreground">
+                  <p className="mt-2 text-[0.6875rem] text-muted-foreground">
                     最少 {activity.minParticipants} 人成行，最多{" "}
                     {activity.maxParticipants} 人；达到上限后停止加入。
                   </p>
@@ -744,7 +715,7 @@ export function PostDetailPage({
                   </div>
                 </div>
                 <div className="mt-3 space-y-3">
-                  {meta.fields.map(([label, value]) => (
+                  {detailFields.map(([label, value]) => (
                     <div
                       key={label}
                       className="flex items-start justify-between gap-4 border-b border-border/60 pb-3 text-sm last:border-0 last:pb-0"
@@ -757,7 +728,7 @@ export function PostDetailPage({
                   ))}
                 </div>
               </section>
-              <div className="flex items-start gap-2 rounded-lg bg-secondary p-3 text-[11px] leading-relaxed text-muted-foreground">
+              <div className="flex items-start gap-2 rounded-lg bg-secondary p-3 text-[0.6875rem] leading-relaxed text-muted-foreground">
                 <WalletCards
                   size={15}
                   className="mt-0.5 shrink-0 text-primary"

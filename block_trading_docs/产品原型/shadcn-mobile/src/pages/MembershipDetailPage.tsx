@@ -89,20 +89,20 @@ export function MembershipDetailPage({
           <div className="mt-4 grid grid-cols-3 divide-x divide-[#cbdccd] text-center">
             <div>
               <strong className="block text-lg">{currentPoints}</strong>
-              <span className="text-[10px] text-muted-foreground">当前积分</span>
+              <span className="text-[0.625rem] text-muted-foreground">当前积分</span>
             </div>
             <div>
               <strong className="block text-lg">{monthlyInvites}/99</strong>
-              <span className="text-[10px] text-muted-foreground">本月邀请</span>
+              <span className="text-[0.625rem] text-muted-foreground">本月邀请</span>
             </div>
             <div>
-              <strong className="block text-[11px] leading-5">
+              <strong className="block text-[0.6875rem] leading-5">
                 普通求助 {membershipTiers[membershipTier].normalQuota - normalHelpUsed} 条
               </strong>
-              <strong className="block text-[11px] leading-5">
+              <strong className="block text-[0.6875rem] leading-5">
                 紧急求助 {membershipTiers[membershipTier].emergencyQuota - emergencyHelpUsed} 条
               </strong>
-              <span className="text-[10px] text-muted-foreground">本月剩余</span>
+              <span className="text-[0.625rem] text-muted-foreground">本月剩余</span>
             </div>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2">
@@ -151,7 +151,7 @@ export function MembershipDetailPage({
                       <strong className="block text-sm">
                         VIP {tier} {current ? "· 当前等级" : ""}
                       </strong>
-                      <span className="mt-1 block text-[11px] leading-5 text-muted-foreground">
+                      <span className="mt-1 block text-[0.6875rem] leading-5 text-muted-foreground">
                         {tier === 1 ? "" : `累计获得积分满 ${item.minEc} 分 · `}每日签到 +{item.dailyCheckInPoints} · 每月普通求助 {item.normalQuota} 条 · 紧急求助 {item.emergencyQuota} 条
                       </span>
                     </span>

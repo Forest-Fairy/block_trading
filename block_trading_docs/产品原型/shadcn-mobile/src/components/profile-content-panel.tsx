@@ -8,7 +8,7 @@ const profileContent = {
   ],
   我参与的: [
     ["周日晚间开黑小队", "今晚 20:00 开始"],
-    ["萧山机场至城西拼车", "周五 19:30 出发"],
+    ["萧山机场至西兴街道拼车", "周五 19:30 出发"],
   ],
   评论评价: [
     ["给林同学的活动评价", "好评 · 2 天前"],
@@ -92,7 +92,7 @@ export function ProfileContentPanel() {
             type="button"
             role="tab"
             aria-selected={activeContent === label}
-            className={`min-w-[100px] shrink-0 whitespace-nowrap rounded-md px-2 py-2 text-[11px] transition ${
+            className={`basis-[28%] shrink-0 whitespace-nowrap rounded-md px-2 py-2 text-[0.6875rem] transition ${
               activeContent === label
                 ? "bg-white font-semibold text-primary shadow-sm"
                 : "text-muted-foreground hover:text-foreground"

@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { IconButton, PageHeader } from "@/components/prototype-shell"
+import { formatCurrentLocation } from "@/lib/location-display"
+import type { AssistantFeedbackSettings } from "@/lib/assistant-feedback"
 import type { PreferenceKey } from "@/prototype/data"
 
 function ToggleRow({
@@ -45,9 +47,13 @@ function ToggleRow({
 export function PreferenceDetailPage({
   preference,
   onBack,
+  assistantFeedback,
+  onAssistantFeedbackChange,
 }: {
   preference: PreferenceKey
   onBack: () => void
+  assistantFeedback: AssistantFeedbackSettings
+  onAssistantFeedbackChange: (settings: AssistantFeedbackSettings) => void
 }) {
   const [toast, setToast] = useState("")
   const [privacy, setPrivacy] = useState({ location: true, recommendation: true, stranger: false })
@@ -64,7 +70,7 @@ export function PreferenceDetailPage({
     preference === "账号与安全" ? (
       <Card className="border-0 shadow-none"><CardContent className="space-y-3 p-0">
         <div className="flex items-center justify-between px-3 py-3"><span><strong className="block text-sm">绑定手机</strong><span className="text-xs text-muted-foreground">138 **** 6621</span></span><Button variant="outline" size="sm" onClick={() => showToast("手机号验证流程将在后续接入")}>更换</Button></div>
-        <div className="border-y border-border/60 px-3 py-3"><strong className="block text-sm">登录设备</strong><p className="mt-1 text-xs text-muted-foreground">Windows · 当前设备 · 杭州</p><Button className="mt-2" variant="outline" size="sm" onClick={() => showToast("其他设备已下线")}>下线其他设备</Button></div>
+        <div className="border-y border-border/60 px-3 py-3"><strong className="block text-sm">登录设备</strong><p className="mt-1 text-xs text-muted-foreground">Windows · 当前设备 · {formatCurrentLocation({ district: "西湖区", street: "古荡街道" })}</p><Button className="mt-2" variant="outline" size="sm" onClick={() => showToast("其他设备已下线")}>下线其他设备</Button></div>
         <button type="button" className="flex w-full items-center justify-between px-3 py-3 text-left" onClick={() => showToast("修改密码页面将在后续接入")}>修改密码 <ChevronRight size={16} className="text-muted-foreground" /></button>
         <button type="button" className="flex w-full items-center justify-between px-3 py-3 text-left text-[var(--qh-coral)]" onClick={() => showToast("已打开账号注销说明")}>账号注销 <ChevronRight size={16} /></button>
       </CardContent></Card>
@@ -86,6 +92,28 @@ export function PreferenceDetailPage({
         <div><strong className="block text-sm">主题</strong><div className="mt-2 grid grid-cols-3 gap-2">{["跟随系统", "浅色", "深色"].map((item) => <Button key={item} type="button" variant={theme === item ? "default" : "outline"} size="sm" onClick={() => setTheme(item)}>{item}</Button>)}</div></div>
         <div className="flex items-center justify-between border-t border-border/60 pt-3"><span><strong className="block text-sm">清理缓存</strong><span className="text-xs text-muted-foreground">当前占用 36 MB</span></span><Button variant="outline" size="sm" onClick={() => showToast("缓存已清理")}>清理</Button></div>
         <ToggleRow label="仅 Wi-Fi 加载原图" description="节省移动网络流量" checked={wifiOnly} onChange={(checked) => { setWifiOnly(checked); showToast("图片网络偏好已保存") }} />
+        <div className="border-t border-border/60 pt-3">
+          <p className="mb-1 text-sm font-semibold">悬浮球反馈</p>
+          <p className="mb-1 text-xs text-muted-foreground">控制展开、收起、弹出和嵌入时的提示反馈。</p>
+          <ToggleRow
+            label="悬浮球音效"
+            description="播放展开、收起、长按和嵌入音效"
+            checked={assistantFeedback.soundEnabled}
+            onChange={(checked) => {
+              onAssistantFeedbackChange({ ...assistantFeedback, soundEnabled: checked })
+              showToast(checked ? "悬浮球音效已开启" : "悬浮球音效已关闭")
+            }}
+          />
+          <ToggleRow
+            label="悬浮球震动"
+            description="支持设备上提供长按、弹出和嵌入震动"
+            checked={assistantFeedback.vibrationEnabled}
+            onChange={(checked) => {
+              onAssistantFeedbackChange({ ...assistantFeedback, vibrationEnabled: checked })
+              showToast(checked ? "悬浮球震动已开启" : "悬浮球震动已关闭")
+            }}
+          />
+        </div>
       </CardContent></Card>
     ) : preference === "帮助与客服" ? (
       <Card className="border-0 shadow-none"><CardContent className="space-y-3 p-3">

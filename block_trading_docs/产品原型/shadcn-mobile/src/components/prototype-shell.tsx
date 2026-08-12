@@ -47,9 +47,9 @@ export function StatusBar({
           {campusMode ? "校园中" : "校园版"}
         </button>
         <span className="flex items-center gap-1.5" aria-hidden="true">
-          <span className="text-[10px]">●●●</span>
-          <span className="text-[10px]">Wi-Fi</span>
-          <span className="rounded-sm border border-current px-1 text-[9px]">
+          <span className="text-[0.625rem]">●●●</span>
+          <span className="text-[0.625rem]">Wi-Fi</span>
+          <span className="rounded-sm border border-current px-1 text-[0.5625rem]">
             100
           </span>
         </span>
@@ -61,12 +61,14 @@ export function StatusBar({
 export function BottomNav({
   current,
   onChange,
+  onRefresh,
   unreadCount,
   campusMode,
   viewerMode = "member",
 }: {
   current: PageKey
   onChange: (page: PageKey) => void
+  onRefresh?: (page: PageKey) => void
   unreadCount: number
   campusMode: boolean
   viewerMode?: ViewerMode
@@ -88,6 +90,9 @@ export function BottomNav({
           data-active={current === key}
           aria-current={current === key ? "page" : undefined}
           onClick={() => onChange(key)}
+          onDoubleClick={() => {
+            if (current === key) onRefresh?.(key)
+          }}
         >
           <span className="relative">
             <Icon size={20} strokeWidth={current === key ? 2.5 : 1.8} />
@@ -200,18 +205,18 @@ export function CommunityCard({
         onClick={onOpenDetail}
         aria-label={`查看${activity.title}详情`}
       >
-        <div className="h-[92px] w-[88px] shrink-0 overflow-hidden rounded-lg bg-muted">
+        <div className="w-[28%] shrink-0 aspect-[22/23] overflow-hidden rounded-lg bg-muted">
           <img className="image-cover" src={activity.image} alt="" />
         </div>
         <div className="min-w-0 flex-1 py-0.5">
           <div className="mb-1 flex items-center justify-between gap-2">
             <Badge
-              className={`border-0 px-2 py-0.5 text-[10px] ${toneClass}`}
+              className={`border-0 px-2 py-0.5 text-[0.625rem] ${toneClass}`}
               variant="outline"
             >
               {activity.type}
             </Badge>
-            <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1 text-[0.6875rem] text-muted-foreground">
               {verified ? (
                 <ShieldCheck size={12} className="text-primary" />
               ) : null}
@@ -223,13 +228,13 @@ export function CommunityCard({
             {activity.detail}
           </p>
           {viewerMode === "guest" ? (
-            <p className="mt-3 text-[11px] text-muted-foreground">
+            <p className="mt-3 text-[0.6875rem] text-muted-foreground">
               描述：{(activity.description ?? activity.detail).slice(0, 30)}
             </p>
           ) : (
             <div className="mt-3 flex items-center gap-2">
               <Progress value={activity.progress} className="h-1.5 flex-1" />
-              <span className="text-[11px] font-semibold whitespace-nowrap text-[var(--qh-coral)]">
+              <span className="text-[0.6875rem] font-semibold whitespace-nowrap text-[var(--qh-coral)]">
                 {participantSummary(activity)}
               </span>
             </div>
@@ -297,7 +302,7 @@ export function ProductCard({
       >
         <img className="image-cover" src={product.image} alt={product.name} />
         <Badge
-          className="absolute top-2 left-2 border-0 bg-white/90 text-[10px] text-primary"
+          className="absolute top-2 left-2 border-0 bg-white/90 text-[0.625rem] text-primary"
           variant="outline"
         >
           {product.tag}
@@ -314,7 +319,7 @@ export function ProductCard({
       </button>
       <CardContent className="p-3">
         <h3 className="truncate text-sm font-bold">{product.name}</h3>
-        <p className="mt-1 truncate text-[11px] text-muted-foreground">
+        <p className="mt-1 truncate text-[0.6875rem] text-muted-foreground">
           {product.description}
         </p>
         <div className="mt-3 flex items-center justify-between gap-2">

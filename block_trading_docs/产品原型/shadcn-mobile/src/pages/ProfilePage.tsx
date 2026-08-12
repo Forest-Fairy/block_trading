@@ -52,6 +52,7 @@ import {
 } from "@/prototype/data"
 import { IconButton } from "@/components/prototype-shell"
 import { ProfileContentPanel } from "@/components/profile-content-panel"
+import { formatCurrentLocation } from "@/lib/location-display"
 
 type MiniProgramGroup = {
   group: string
@@ -370,7 +371,7 @@ export function ProfilePage({
               <AvatarFallback>林</AvatarFallback>
             </Avatar>
           </button>
-          <CardContent className="relative z-10 px-0 pt-[1.35rem] pb-[3px]">
+          <CardContent className="relative z-10 px-0 pt-[1.35rem] pb-[0.1875rem]">
             <div className="grid grid-cols-[5.5rem_minmax(0,1fr)_2rem] grid-rows-[3.2rem_auto_auto] gap-x-2">
               <div className="col-start-2 row-start-1 flex min-w-0 self-stretch flex-col justify-end">
                 <h2 className="text-lg font-extrabold leading-tight">
@@ -378,7 +379,7 @@ export function ProfilePage({
                     {viewerMode === "guest" ? "游客" : profileDisplayName}
                   </ProfileSummaryMarquee>
                 </h2>
-                <p className="mt-1 text-[10px] leading-none text-muted-foreground">
+                <p className="mt-1 text-[0.625rem] leading-none text-muted-foreground">
                   <ProfileSummaryMarquee>{profileUsername}</ProfileSummaryMarquee>
                 </p>
               </div>
@@ -393,16 +394,16 @@ export function ProfilePage({
                   </IconButton>
                 </div>
               ) : null}
-              <div className="col-start-1 row-start-2 flex flex-col items-center gap-1 pt-1.5 text-[10px] text-muted-foreground">
+              <div className="col-start-1 row-start-2 flex flex-col items-center gap-1 pt-1.5 text-[0.625rem] text-muted-foreground">
                 <span className="flex items-center gap-0.5 whitespace-nowrap">
                   <Star size={10} className="fill-[#f3bf54] text-[#c48a13]" /> 好评率 98%
                 </span>
                 <span className="flex items-center gap-0.5 whitespace-nowrap">
-                  <MapPin size={10} className="text-primary" /> 杭州 · 西湖区
+                  <MapPin size={10} className="text-primary" /> {formatCurrentLocation({ district: "西湖区", street: "古荡街道" })}
                 </span>
                 <div className="flex flex-wrap justify-center gap-1">
                   {viewerMode === "member" && studentVerified ? (
-                    <Badge className="border-0 bg-white/80 text-[10px] text-primary" variant="outline">
+                    <Badge className="border-0 bg-white/80 text-[0.625rem] text-primary" variant="outline">
                       <ShieldCheck size={11} /> 杭州大学 · 西湖校区
                     </Badge>
                   ) : null}
@@ -431,7 +432,7 @@ export function ProfilePage({
               <Button
                 type="button"
                 size="sm"
-                className={`h-8 min-w-[5.6rem] px-2 text-[10px] whitespace-nowrap ${
+                className={`h-8 min-w-[5.6rem] px-2 text-[0.625rem] whitespace-nowrap ${
                   checkedIn
                     ? "bg-primary text-primary-foreground hover:bg-primary/90"
                     : "bg-[#d9a321] text-white hover:bg-[#c28f17]"
@@ -480,7 +481,7 @@ export function ProfilePage({
                   <button
                     key={label}
                     type="button"
-                    className="flex min-h-[92px] w-[112px] shrink-0 flex-col items-center justify-center gap-2 rounded-lg border border-border bg-white px-2 py-3 text-center transition hover:border-primary/40"
+                    className="flex basis-[31%] shrink-0 aspect-[28/23] flex-col items-center justify-center gap-2 rounded-lg border border-border bg-white px-2 py-3 text-center transition hover:border-primary/40"
                     onClick={() => {
                       setMiniProgramToast(`已打开${label}`)
                       window.setTimeout(() => setMiniProgramToast(""), 2200)
@@ -491,7 +492,7 @@ export function ProfilePage({
                     </span>
                     <span>
                       <strong className="block text-xs">{label}</strong>
-                      <span className="mt-1 block text-[10px] text-muted-foreground">
+                      <span className="mt-1 block text-[0.625rem] text-muted-foreground">
                         {description}
                       </span>
                     </span>
@@ -509,7 +510,7 @@ export function ProfilePage({
           >
             <SheetContent
               side="right"
-              className="w-[min(94vw,420px)] overflow-y-auto p-0"
+              className="w-[min(94vw,26.25rem)] overflow-y-auto p-0"
             >
               <SheetHeader className="border-b border-border/70">
                 <div className="flex items-center justify-between gap-2 pr-8">
@@ -525,7 +526,7 @@ export function ProfilePage({
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="h-8 gap-1 px-2 text-[10px]"
+                        className="h-8 gap-1 px-2 text-[0.625rem]"
                         onClick={() => setNewCategoryOpen(true)}
                       >
                         <Plus size={13} /> 新增分类
@@ -533,7 +534,7 @@ export function ProfilePage({
                       <Button
                         type="button"
                         size="sm"
-                        className="h-8 gap-1 px-2 text-[10px]"
+                        className="h-8 gap-1 px-2 text-[0.625rem]"
                         onClick={saveMiniProgramLayout}
                       >
                         <Save size={13} /> 保存
@@ -556,7 +557,7 @@ export function ProfilePage({
                             {group.label}
                           </span>
                           {miniProgramLayoutMode ? (
-                            <span className="text-[10px] text-muted-foreground">
+                            <span className="text-[0.625rem] text-muted-foreground">
                               {items.length} 个小程序
                             </span>
                           ) : null}
@@ -584,7 +585,7 @@ export function ProfilePage({
                               ) : null}
                               <button
                                 type="button"
-                                className="absolute right-2 top-2 flex items-center gap-0.5 text-[10px] text-muted-foreground"
+                                className="absolute right-2 top-2 flex items-center gap-0.5 text-[0.625rem] text-muted-foreground"
                                 aria-label={favorite ? `取消收藏${label}` : `收藏${label}`}
                                 onPointerDown={(event) => event.stopPropagation()}
                                 onClick={() => toggleMiniProgramFavorite(id)}
@@ -610,7 +611,7 @@ export function ProfilePage({
                                 </span>
                                 <span>
                                   <strong className="block text-xs">{label}</strong>
-                                  <span className="mt-1 block text-[10px] text-muted-foreground">
+                                  <span className="mt-1 block text-[0.625rem] text-muted-foreground">
                                     {description}
                                   </span>
                                 </span>
@@ -620,7 +621,7 @@ export function ProfilePage({
                                   <select
                                     value={currentGroup}
                                     aria-label={`${label}所属分类`}
-                                    className="h-8 w-full rounded-md border border-border bg-white px-2 text-[10px]"
+                                    className="h-8 w-full rounded-md border border-border bg-white px-2 text-[0.625rem]"
                                     onPointerDown={(event) => event.stopPropagation()}
                                     onChange={(event) =>
                                       moveMiniProgramToGroup(id, event.target.value)
@@ -637,7 +638,7 @@ export function ProfilePage({
                                       type="button"
                                       variant="outline"
                                       size="sm"
-                                      className="h-7 text-[10px]"
+                                      className="h-7 text-[0.625rem]"
                                       onPointerDown={(event) => event.stopPropagation()}
                                       onClick={() => shiftMiniProgram(id, -1)}
                                     >
@@ -647,7 +648,7 @@ export function ProfilePage({
                                       type="button"
                                       variant="outline"
                                       size="sm"
-                                      className="h-7 text-[10px]"
+                                      className="h-7 text-[0.625rem]"
                                       onPointerDown={(event) => event.stopPropagation()}
                                       onClick={() => shiftMiniProgram(id, 1)}
                                     >
@@ -688,7 +689,7 @@ export function ProfilePage({
             </SheetContent>
           </Sheet>
           <Sheet open={settingsPanelOpen} onOpenChange={setSettingsPanelOpen}>
-            <SheetContent side="right" className="w-[min(92vw,400px)] overflow-y-auto p-0">
+            <SheetContent side="right" className="w-[min(92vw,25rem)] overflow-y-auto p-0">
               <SheetHeader className="border-b border-border/70">
                 <SheetTitle>设置</SheetTitle>
                 <SheetDescription>管理账号、隐私和应用偏好。</SheetDescription>
@@ -777,7 +778,7 @@ export function ProfilePage({
                         <span className="absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow-sm transition peer-checked:translate-x-5" />
                       </span>
                     </label>
-                    <p className="mt-3 rounded-lg bg-muted p-2.5 text-[11px] leading-relaxed text-muted-foreground">
+                    <p className="mt-3 rounded-lg bg-muted p-2.5 text-[0.6875rem] leading-relaxed text-muted-foreground">
                       学生认证仅自身可见。开启校园版后，新发帖子默认仅同校可见；内容列表除本人和关注用户发布外，仅展示同校区内容。
                     </p>
                   </div>
@@ -855,7 +856,7 @@ export function ProfilePage({
                   </div>
                 </div>
                 <label className="block space-y-1">
-                  <span className="text-[10px] text-muted-foreground">用户昵称</span>
+                  <span className="text-[0.625rem] text-muted-foreground">用户昵称</span>
                   <Input
                     value={profileDraftName}
                     maxLength={20}
@@ -865,7 +866,7 @@ export function ProfilePage({
                   />
                 </label>
                 <label className="block space-y-1">
-                  <span className="text-[10px] text-muted-foreground">用户名</span>
+                  <span className="text-[0.625rem] text-muted-foreground">用户名</span>
                   <Input
                     value={profileDraftUsername}
                     maxLength={30}
@@ -875,7 +876,7 @@ export function ProfilePage({
                   />
                 </label>
                 <label className="block space-y-1">
-                  <span className="text-[10px] text-muted-foreground">个性签名</span>
+                  <span className="text-[0.625rem] text-muted-foreground">个性签名</span>
                   <Input
                     value={profileDraftBio}
                     maxLength={80}
@@ -896,7 +897,7 @@ export function ProfilePage({
             </DialogContent>
           </Dialog>
           <Dialog open={avatarPreviewOpen} onOpenChange={setAvatarPreviewOpen}>
-            <DialogContent className="max-w-[min(92vw,360px)] overflow-hidden p-0">
+            <DialogContent className="max-w-[min(92vw,22.5rem)] overflow-hidden p-0">
               <DialogHeader className="sr-only">
                 <DialogTitle>头像预览</DialogTitle>
               </DialogHeader>

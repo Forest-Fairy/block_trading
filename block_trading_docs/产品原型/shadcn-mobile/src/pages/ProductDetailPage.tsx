@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { products } from "@/prototype/data"
 import { IconButton, PageHeader } from "@/components/prototype-shell"
+import { formatCurrentLocation } from "@/lib/location-display"
 
 export function ProductDetailPage({
   productId,
@@ -58,7 +59,7 @@ export function ProductDetailPage({
             <div className="flex items-center justify-between gap-3">
               <Badge
                 variant="outline"
-                className="border-0 bg-[var(--qh-yellow-soft)] text-[10px] text-[#77551c]"
+                className="border-0 bg-[var(--qh-yellow-soft)] text-[0.625rem] text-[#77551c]"
               >
                 趣汇自营 · {product.tag}
               </Badge>
@@ -82,7 +83,7 @@ export function ProductDetailPage({
               ¥ {product.price}
             </p>
           </div>
-          <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted p-3 text-center text-[11px] text-muted-foreground">
+          <div className="grid grid-cols-3 gap-2 rounded-lg bg-muted p-3 text-center text-[0.6875rem] text-muted-foreground">
             <span className="flex flex-col items-center gap-1">
               <ShieldCheck size={15} className="text-primary" />
               正品保障
@@ -104,7 +105,7 @@ export function ProductDetailPage({
               <p>规格：标准款 · 当前库存充足</p>
               <p className="flex items-center gap-1">
                 <MapPin size={13} className="text-primary" />
-                配送范围：杭州主城区，预计 1-2 个工作日送达
+                配送范围：{formatCurrentLocation({ district: "滨江区", street: "西兴街道" })}，预计 1-2 个工作日送达
               </p>
               <p>售后：签收后 7 天内支持质量问题退换</p>
             </div>
@@ -112,7 +113,7 @@ export function ProductDetailPage({
           <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-4">
             <div>
               <p className="text-xs font-semibold">想进一步了解？</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">
+              <p className="mt-1 text-[0.6875rem] text-muted-foreground">
                 查看规格与配送说明后再决定
               </p>
             </div>
