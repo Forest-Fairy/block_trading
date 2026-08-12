@@ -270,7 +270,7 @@ CREATE TABLE qh_post (
     visibility_scope VARCHAR2(16 CHAR) NOT NULL,
     campus_id NUMBER(19),
     join_mode VARCHAR2(16 CHAR) DEFAULT 'DIRECT' NOT NULL,
-    title VARCHAR2(180 CHAR) NOT NULL,
+    title VARCHAR2(60 CHAR) NOT NULL,
     content CLOB,
     current_participants NUMBER(5) DEFAULT 0 NOT NULL,
     min_participants NUMBER(5) DEFAULT 1 NOT NULL,
@@ -351,6 +351,19 @@ CREATE TABLE qh_post_change_log (
     after_snapshot CLOB,
     created_at TIMESTAMP(6) NOT NULL,
     CONSTRAINT pk_qh_post_change_log PRIMARY KEY (id)
+);
+
+CREATE TABLE qh_post_status_log (
+    id NUMBER(19) NOT NULL,
+    post_id NUMBER(19) NOT NULL,
+    from_status VARCHAR2(32 CHAR),
+    to_status VARCHAR2(32 CHAR) NOT NULL,
+    reason_code VARCHAR2(32 CHAR),
+    reason_detail VARCHAR2(500 CHAR),
+    operator_type VARCHAR2(16 CHAR) NOT NULL,
+    operator_id NUMBER(19),
+    occurred_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT pk_qh_post_status_log PRIMARY KEY (id)
 );
 
 CREATE TABLE qh_post_group_buy (
@@ -698,8 +711,8 @@ CREATE TABLE qh_order (
 CREATE TABLE qh_order_item (
     id NUMBER(19) NOT NULL,
     order_id NUMBER(19) NOT NULL,
-    product_id NUMBER(19) NOT NULL,
-    sku_id NUMBER(19) NOT NULL,
+    product_id NUMBER(19),
+    sku_id NUMBER(19),
     source_type VARCHAR2(24 CHAR) DEFAULT 'PRODUCT_SKU' NOT NULL,
     source_id NUMBER(19),
     product_name_snapshot VARCHAR2(180 CHAR) NOT NULL,
@@ -710,8 +723,8 @@ CREATE TABLE qh_order_item (
     created_at TIMESTAMP(6) NOT NULL,
     CONSTRAINT pk_qh_order_item PRIMARY KEY (id),
     CONSTRAINT ck_qh_order_item_source CHECK (
-        (source_type = 'PRODUCT_SKU' AND product_id IS NOT NULL AND sku_id IS NOT NULL)
-        OR (source_type = 'USER_LISTING' AND source_id IS NOT NULL)
+        (source_type = 'PRODUCT_SKU' AND product_id IS NOT NULL AND sku_id IS NOT NULL AND source_id IS NULL)
+        OR (source_type = 'USER_LISTING' AND source_id IS NOT NULL AND product_id IS NULL AND sku_id IS NULL)
     )
 );
 
@@ -807,6 +820,23 @@ CREATE TABLE qh_product_review (
     CONSTRAINT pk_qh_product_review PRIMARY KEY (id)
 );
 
+CREATE TABLE qh_user_review (
+    id NUMBER(19) NOT NULL,
+    reviewer_id NUMBER(19) NOT NULL,
+    reviewed_user_id NUMBER(19) NOT NULL,
+    relation_type VARCHAR2(24 CHAR) NOT NULL,
+    relation_id NUMBER(19) NOT NULL,
+    rating NUMBER(2) NOT NULL,
+    content VARCHAR2(2000 CHAR),
+    review_status VARCHAR2(24 CHAR) NOT NULL,
+    created_at TIMESTAMP(6) NOT NULL,
+    updated_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT uk_qh_user_review_relation UNIQUE (reviewer_id, reviewed_user_id, relation_type, relation_id),
+    CONSTRAINT ck_qh_user_review_self CHECK (reviewer_id <> reviewed_user_id),
+    CONSTRAINT ck_qh_user_review_rating CHECK (rating BETWEEN 1 AND 5),
+    CONSTRAINT pk_qh_user_review PRIMARY KEY (id)
+);
+
 CREATE TABLE qh_content_event (
     id NUMBER(19) NOT NULL,
     user_id NUMBER(19),
@@ -852,8 +882,8 @@ CREATE TABLE qh_user_mini_program (
     user_id NUMBER(19) NOT NULL,
     mini_program_id NUMBER(19) NOT NULL,
     favorite_flag CHAR(1) DEFAULT 'N' NOT NULL,
-    group_name VARCHAR2(80 CHAR),
-    sort_order NUMBER(5) DEFAULT 0 NOT NULL,
+    group_id NUMBER(19),
+    sort_order NUMBER(5),
     use_count NUMBER(10) DEFAULT 0 NOT NULL,
     last_queried_at TIMESTAMP(6),
     created_at TIMESTAMP(6) NOT NULL,
@@ -861,6 +891,20 @@ CREATE TABLE qh_user_mini_program (
     CONSTRAINT uk_qh_user_mini_program UNIQUE (user_id, mini_program_id),
     CONSTRAINT ck_qh_user_mini_favorite CHECK (favorite_flag IN ('Y','N')),
     CONSTRAINT pk_qh_user_mini_program PRIMARY KEY (id)
+);
+
+CREATE TABLE qh_user_mini_program_group (
+    id NUMBER(19) NOT NULL,
+    user_id NUMBER(19) NOT NULL,
+    group_code VARCHAR2(80 CHAR) NOT NULL,
+    group_name VARCHAR2(80 CHAR) NOT NULL,
+    sort_order NUMBER(5) DEFAULT 0 NOT NULL,
+    label_visible CHAR(1) DEFAULT 'Y' NOT NULL,
+    created_at TIMESTAMP(6) NOT NULL,
+    updated_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT uk_qh_user_mini_group UNIQUE (user_id, group_code),
+    CONSTRAINT ck_qh_user_mini_group_flag CHECK (label_visible IN ('Y','N')),
+    CONSTRAINT pk_qh_user_mini_program_group PRIMARY KEY (id)
 );
 
 CREATE TABLE qh_support_ticket (
@@ -880,9 +924,93 @@ CREATE TABLE qh_support_ticket (
     CONSTRAINT pk_qh_support_ticket PRIMARY KEY (id)
 );
 
+CREATE TABLE qh_post_draft (
+    id NUMBER(19) NOT NULL,
+    author_id NUMBER(19) NOT NULL,
+    source_post_id NUMBER(19),
+    post_type VARCHAR2(32 CHAR),
+    draft_source VARCHAR2(24 CHAR) NOT NULL,
+    draft_payload CLOB NOT NULL,
+    version NUMBER(10) DEFAULT 0 NOT NULL,
+    expires_at TIMESTAMP(6),
+    created_at TIMESTAMP(6) NOT NULL,
+    updated_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT pk_qh_post_draft PRIMARY KEY (id)
+);
+
+CREATE TABLE qh_user_search_history (
+    id NUMBER(19) NOT NULL,
+    user_id NUMBER(19) NOT NULL,
+    search_scope VARCHAR2(24 CHAR) NOT NULL,
+    query_text VARCHAR2(200 CHAR) NOT NULL,
+    normalized_query VARCHAR2(200 CHAR) NOT NULL,
+    search_count NUMBER(10) DEFAULT 1 NOT NULL,
+    last_searched_at TIMESTAMP(6) NOT NULL,
+    created_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT uk_qh_user_search_history UNIQUE (user_id, search_scope, normalized_query),
+    CONSTRAINT ck_qh_search_history_count CHECK (search_count >= 1),
+    CONSTRAINT pk_qh_user_search_history PRIMARY KEY (id)
+);
+
+CREATE TABLE qh_share_link (
+    id NUMBER(19) NOT NULL,
+    share_code VARCHAR2(64 CHAR) NOT NULL,
+    sharer_id NUMBER(19),
+    target_type VARCHAR2(24 CHAR) NOT NULL,
+    target_id NUMBER(19) NOT NULL,
+    share_channel VARCHAR2(24 CHAR) NOT NULL,
+    landing_path VARCHAR2(500 CHAR),
+    status VARCHAR2(16 CHAR) NOT NULL,
+    expires_at TIMESTAMP(6),
+    created_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT uk_qh_share_link_code UNIQUE (share_code),
+    CONSTRAINT pk_qh_share_link PRIMARY KEY (id)
+);
+
+CREATE TABLE qh_user_behavior_event (
+    id NUMBER(19) NOT NULL,
+    event_name VARCHAR2(64 CHAR) NOT NULL,
+    occurred_at TIMESTAMP(6) NOT NULL,
+    user_id NUMBER(19),
+    anonymous_id VARCHAR2(128 CHAR),
+    session_id VARCHAR2(128 CHAR),
+    device_id VARCHAR2(160 CHAR),
+    page_code VARCHAR2(80 CHAR),
+    target_type VARCHAR2(24 CHAR),
+    target_id NUMBER(19),
+    share_link_id NUMBER(19),
+    source_type VARCHAR2(24 CHAR),
+    source_id NUMBER(19),
+    request_id VARCHAR2(64 CHAR),
+    client_platform VARCHAR2(24 CHAR),
+    event_properties CLOB,
+    CONSTRAINT ck_qh_behavior_subject CHECK (user_id IS NOT NULL OR anonymous_id IS NOT NULL),
+    CONSTRAINT pk_qh_user_behavior_event PRIMARY KEY (id)
+);
+
+CREATE TABLE qh_operation_audit_log (
+    id NUMBER(19) NOT NULL,
+    occurred_at TIMESTAMP(6) NOT NULL,
+    module_code VARCHAR2(48 CHAR) NOT NULL,
+    action_code VARCHAR2(64 CHAR) NOT NULL,
+    operator_type VARCHAR2(24 CHAR) NOT NULL,
+    operator_id NUMBER(19),
+    target_type VARCHAR2(24 CHAR) NOT NULL,
+    target_id NUMBER(19) NOT NULL,
+    result_code VARCHAR2(24 CHAR) NOT NULL,
+    request_id VARCHAR2(64 CHAR),
+    device_id VARCHAR2(160 CHAR),
+    client_ip_hash VARCHAR2(128 CHAR),
+    before_snapshot CLOB,
+    after_snapshot CLOB,
+    remark VARCHAR2(1000 CHAR),
+    CONSTRAINT pk_qh_operation_audit_log PRIMARY KEY (id)
+);
+
 CREATE INDEX ix_qh_post_feed ON qh_post (status, post_type, primary_occurs_at, published_at);
 CREATE INDEX ix_qh_post_scope ON qh_post (visibility_scope, campus_id, published_at);
 CREATE INDEX ix_qh_post_participant_user ON qh_post_participant (user_id, join_status, updated_at);
+CREATE INDEX ix_qh_post_status_time ON qh_post_status_log (post_id, occurred_at);
 CREATE INDEX ix_qh_post_comment ON qh_post_comment (post_id, parent_id, created_at);
 CREATE INDEX ix_qh_chat_room_user_time ON qh_chat_room (room_status, last_message_at);
 CREATE INDEX ix_qh_chat_message_room_time ON qh_chat_message (room_id, sent_at);
@@ -898,4 +1026,14 @@ CREATE INDEX ix_qh_favorite_target ON qh_favorite (target_type, target_id, creat
 CREATE INDEX ix_qh_redeem_user ON qh_redeem_record (user_id, created_at);
 CREATE INDEX ix_qh_delivery_order ON qh_order_delivery (order_id, delivery_status);
 CREATE INDEX ix_qh_delivery_event ON qh_order_delivery_event (delivery_id, occurred_at);
+CREATE INDEX ix_qh_user_review_target ON qh_user_review (reviewed_user_id, review_status, created_at);
 CREATE INDEX ix_qh_support_user_status ON qh_support_ticket (user_id, status, updated_at);
+CREATE INDEX ix_qh_mini_group_user_sort ON qh_user_mini_program_group (user_id, sort_order);
+CREATE INDEX ix_qh_post_draft_user_time ON qh_post_draft (author_id, updated_at);
+CREATE INDEX ix_qh_post_draft_source ON qh_post_draft (source_post_id, updated_at);
+CREATE INDEX ix_qh_search_history_user_time ON qh_user_search_history (user_id, last_searched_at);
+CREATE INDEX ix_qh_share_link_target ON qh_share_link (target_type, target_id, created_at);
+CREATE INDEX ix_qh_behavior_event_time ON qh_user_behavior_event (occurred_at, event_name);
+CREATE INDEX ix_qh_behavior_event_user ON qh_user_behavior_event (user_id, occurred_at);
+CREATE INDEX ix_qh_audit_log_target ON qh_operation_audit_log (target_type, target_id, occurred_at);
+CREATE INDEX ix_qh_audit_log_request ON qh_operation_audit_log (request_id, occurred_at);

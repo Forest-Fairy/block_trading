@@ -17,3 +17,6 @@
 - 追加消息媒体与配送轨迹实体，并形成“系统功能 -> 实体 -> 校验结论”矩阵；确认文档已覆盖的首期功能均有持久化承载，跨表状态机和权限留在应用服务层。
 - 根据系统级产品规划补齐用户转卖最小模型：刊登、媒体与订单项来源；未扩展尚未定义流程的议价、担保与票券核销。
 - 最终静态验证：56 张表、56 个主键、19 个索引、39 个检查约束；无重复表/约束名、无超出 Oracle 30 字符的约束名、无 `FOREIGN KEY`/`REFERENCES`、括号平衡。根 Maven `validate` 通过。
+- 根据当前原型复核并补齐草稿、搜索、小程序自定义分类、分享归因、用户行为分析和操作审计的实体边界；草稿与正式帖子拆分，避免不完整表单违反正式实体的发布约束。
+- 已新增 `qh_post_draft`、`qh_user_search_history`、`qh_share_link`、`qh_user_behavior_event`、`qh_operation_audit_log`、`qh_user_mini_program_group`，并将小程序分组由名称字段调整为 `group_id` 关系字段。
+- 复核后 Oracle 脚本为 62 张表、62 个主键、27 个索引、133 个约束；仍无 SQL 外键/`REFERENCES`、无重复或超长约束名、括号平衡。原型 `npm run lint`、`npm run build` 与根 `mvn validate` 通过；浏览器验证最近搜索提交和结果切换正常、控制台无原型错误。
