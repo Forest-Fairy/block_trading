@@ -16,37 +16,39 @@ type Tone = {
   waveform?: OscillatorType
   attackDuration?: number
   releaseDuration?: number
+  quarterSineAttack?: boolean
 }
 
 const soundTones: Record<AssistantSound, Tone[]> = {
-  "menu-open": [{ frequency: 1024, endFrequency: 1320, duration: 0.18, gain: 0.035 }],
-  "menu-close": [{ frequency: 880, endFrequency: 620, duration: 0.16, gain: 0.035 }],
+  "menu-open": [{ frequency: 1024, endFrequency: 1320, duration: 0.18, gain: 0.435 }],
+  "menu-close": [{ frequency: 880, endFrequency: 420, duration: 0.16, gain: 0.635 }],
   hold: Array.from({ length: 20 }, (_, index) => ({
-    frequency: index % 2 ? 760 : 680,
-    duration: 0.1,
-    delay: index * 0.14,
-    gain: 0.04,
+    frequency: index % 2 ? 1260 : 280,
+    duration: .12,
+    delay: index * 0.16,
+    gain: 0.854,
+    waveform: 'sine',
   })),
   double: [
     { frequency: 620, duration: 0.12, gain: 0.035 },
     { frequency: 900, duration: 0.13, delay: 0.1, gain: 0.04 },
   ],
   pop: [
-    { frequency: 420, duration: 0.08, gain: 0.04 },
-    { frequency: 760, duration: 0.16, delay: 0.07, gain: 0.045 },
+    { frequency: 420, duration: 0.08, gain: 0.774 },
+    { frequency: 760, duration: 0.16, delay: 0.07, gain: 0.587 },
   ],
   "dock-charge": [
     {
-      frequency: 620,
-      endFrequency: 1600,
-      duration: 2.6,
-      gain: 0.035,
-      waveform: "triangle",
-      attackDuration: 0.8,
+      frequency: 260,
+      endFrequency: 2280,
+      duration: 10.24,
+      gain: 0.635,
+      waveform: "sine",
+      quarterSineAttack: true,
     },
   ],
   "dock-complete": [
-    { frequency: 1342, duration: 1.2, gain: 0.055, waveform: "sine" },
+    { frequency: 1342, duration: 1.2, gain: 0.655, waveform: "sine" },
   ],
 }
 
@@ -101,6 +103,7 @@ export function playAssistantSound(
         waveform = "sine",
         attackDuration = 0.012,
         releaseDuration = 0,
+        quarterSineAttack = false,
       }) => {
         const oscillator = context.createOscillator()
         const volume = context.createGain()
@@ -115,14 +118,25 @@ export function playAssistantSound(
           )
         }
         volume.gain.setValueAtTime(0.0001, startAt)
-        volume.gain.exponentialRampToValueAtTime(
-          gain * assistantSoundVolume,
-          startAt + attackDuration
-        )
-        if (releaseDuration) {
-          volume.gain.setValueAtTime(gain * assistantSoundVolume, releaseAt)
+        if (quarterSineAttack) {
+          // The charge rises along a quarter sine curve and stops at its peak.
+          const curveSteps = 64
+          const quarterSineCurve = new Float32Array(curveSteps)
+          for (let index = 0; index < curveSteps; index += 1) {
+            const progress = index / (curveSteps - 1)
+            quarterSineCurve[index] = Math.sin((Math.PI / 2) * progress) * gain * assistantSoundVolume
+          }
+          volume.gain.setValueCurveAtTime(quarterSineCurve, startAt, duration)
+        } else {
+          volume.gain.exponentialRampToValueAtTime(
+            gain * assistantSoundVolume,
+            startAt + attackDuration
+          )
+          if (releaseDuration) {
+            volume.gain.setValueAtTime(gain * assistantSoundVolume, releaseAt)
+          }
+          volume.gain.exponentialRampToValueAtTime(0.0001, startAt + duration)
         }
-        volume.gain.exponentialRampToValueAtTime(0.0001, startAt + duration)
         oscillator.connect(volume)
         volume.connect(context.destination)
         if (sound === "dock-charge") {
@@ -136,7 +150,7 @@ export function playAssistantSound(
         activeSoundOscillators.set(sound, soundOscillators)
         oscillator.addEventListener("ended", () => soundOscillators.delete(oscillator))
         oscillator.start(startAt)
-        oscillator.stop(startAt + duration + 0.02)
+        oscillator.stop(startAt + duration + (quarterSineAttack ? 0 : 0.02))
       }
     )
   }

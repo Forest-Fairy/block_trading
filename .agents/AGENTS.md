@@ -123,3 +123,13 @@
 - 实体设计统一以ORACLE规范完成
 - 实体中的外键不需要在数据库中创建外键约束, 而是应用层完成外键约束
 
+## DDD 服务与启动模块规则
+
+- Maven Reactor 只按 `UserInterface`、`Application`、`Domain`、`Infrastructure` 四个 DDD 层组织生产代码；禁止建立跨领域的统一 `Runtime` 层或 `统一 Runtime` 聚合。
+- 独立运行是部署单元的属性，不是每个 DDD 层父模块的强制属性。需要独立部署的具体业务模块，才在所属层级内部创建对应的 `*_boot` 模块作为组合根；未确认部署边界和测试准入前，不创建空的 Boot 模块。
+- `*_boot` 只负责启动、依赖注入、Adapter 选择、配置绑定、健康检查和可执行产物生成；不得承载领域规则，也不得成为跨领域业务逻辑的集中入口。部署脚本和环境资产归 `block_trading_deployment`，不放入 Boot 或领域模块。
+- 外部 HTTP、WebSocket、RPC、文件或第三方回调请求只能进入 `UserInterface` Adapter；不得直接访问 Application 实现、Domain 实现、Repository 或 Infrastructure。
+- Application 可以被 UserInterface、内部任务或其他受控应用 Adapter 调用，但只能依赖公开 API 和端口。Domain 之间禁止依赖彼此的具体实现或数据库表。
+- 不同领域之间按部署关系选择通信方式：同一进程使用版本化 API 的进程内 Adapter；不同服务使用 REST/Feign 等同步协议；可靠异步协作用本域 Outbox、版本化事件和消费方 Inbox。通信方式由具体 Boot 或 Adapter 选择，不由 Domain 代码决定。
+- `block_trading_system_test` 只承担跨层、跨领域和启动装配验证，不得为了运行测试重新引入统一 Runtime；测试可以在测试代码中组装多个层的实现。
+

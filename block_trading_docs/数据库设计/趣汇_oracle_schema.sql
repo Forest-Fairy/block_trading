@@ -331,6 +331,11 @@ CREATE TABLE qh_post_participant (
     user_id NUMBER(19) NOT NULL,
     join_status VARCHAR2(24 CHAR) NOT NULL,
     payment_status VARCHAR2(24 CHAR) DEFAULT 'NOT_REQUIRED' NOT NULL,
+    group_buy_settlement_id NUMBER(19),
+    group_buy_order_id NUMBER(19),
+    payment_projection_event_id VARCHAR2(64 CHAR),
+    payment_projection_version NUMBER(10),
+    payment_projected_at TIMESTAMP(6),
     member_role VARCHAR2(16 CHAR) NOT NULL,
     applied_at TIMESTAMP(6) NOT NULL,
     confirmed_at TIMESTAMP(6),
@@ -746,6 +751,28 @@ CREATE TABLE qh_payment (
     CONSTRAINT pk_qh_payment PRIMARY KEY (id)
 );
 
+CREATE TABLE qh_group_buy_settlement (
+    id NUMBER(19) NOT NULL,
+    settlement_no VARCHAR2(40 CHAR) NOT NULL,
+    post_id NUMBER(19) NOT NULL,
+    participant_id NUMBER(19) NOT NULL,
+    user_id NUMBER(19) NOT NULL,
+    region_id NUMBER(19) NOT NULL,
+    order_id NUMBER(19),
+    reservation_id NUMBER(19),
+    payment_id NUMBER(19),
+    settlement_status VARCHAR2(24 CHAR) NOT NULL,
+    idempotency_key VARCHAR2(96 CHAR) NOT NULL,
+    source_event_id VARCHAR2(64 CHAR) NOT NULL,
+    source_event_version NUMBER(10) NOT NULL,
+    created_at TIMESTAMP(6) NOT NULL,
+    updated_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT uk_qh_group_buy_settlement_no UNIQUE (settlement_no),
+    CONSTRAINT uk_qh_group_buy_participant UNIQUE (post_id, participant_id),
+    CONSTRAINT uk_qh_group_buy_idempotency UNIQUE (idempotency_key),
+    CONSTRAINT pk_qh_group_buy_settlement PRIMARY KEY (id)
+);
+
 CREATE TABLE qh_order_status_log (
     id NUMBER(19) NOT NULL,
     order_id NUMBER(19) NOT NULL,
@@ -1010,7 +1037,9 @@ CREATE TABLE qh_operation_audit_log (
 CREATE INDEX ix_qh_post_feed ON qh_post (status, post_type, primary_occurs_at, published_at);
 CREATE INDEX ix_qh_post_scope ON qh_post (visibility_scope, campus_id, published_at);
 CREATE INDEX ix_qh_post_participant_user ON qh_post_participant (user_id, join_status, updated_at);
+CREATE INDEX ix_qh_post_participant_settlement ON qh_post_participant (group_buy_settlement_id, payment_projection_event_id);
 CREATE INDEX ix_qh_post_status_time ON qh_post_status_log (post_id, occurred_at);
+CREATE INDEX ix_qh_group_buy_order ON qh_group_buy_settlement (order_id, settlement_status);
 CREATE INDEX ix_qh_post_comment ON qh_post_comment (post_id, parent_id, created_at);
 CREATE INDEX ix_qh_chat_room_user_time ON qh_chat_room (room_status, last_message_at);
 CREATE INDEX ix_qh_chat_message_room_time ON qh_chat_message (room_id, sent_at);
