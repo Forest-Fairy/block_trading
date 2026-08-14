@@ -1,2 +1,2 @@
 标题,scope,路径,摘要,状态
-趣汇系统架构设计,项目文档,content.md,定义趣汇 R1-R4 的总体架构、quhui_server/quhui_client 入口边界、领域边界、数据与事件架构、部署演进、安全治理和技术选型,已规划
+趣汇系统架构设计,项目文档,content.md,定义趣汇 R1-R4 总体架构、block_trading_server/client/deployment 入口边界、领域与数据事件架构、部署号选库、自动发布回滚、日志切片归档、安全治理和技术选型,已规划

@@ -35,26 +35,27 @@
 | 入口类型 | 当前入口 | 当前状态 | 允许访问的边界 |
 |---|---|---|---|
 | Maven 构建入口 | 根目录 `pom.xml` | 当前只聚合 `block_trading_docs` | 文档构建与校验 |
-| 后端目标根 | `quhui_server` | 未创建，未来由根 Maven Reactor 聚合 | 仅承载 `quhui_user_interface`、`quhui_application`、`quhui_domain`、`quhui_infrastructure` 与 `quhui_system_test` |
-| 前端目标根 | `quhui_client` | 未创建，不进入 Maven Reactor | R1 管理 Web 移动、小程序与 `quhui_web_pc_admin`；R3 管理 Android/iOS；R4 管理 `quhui_web_pc_user` 与平板终端工程 |
+| 后端目标根 | `block_trading_server` | 未创建，未来由根 Maven Reactor 聚合 | 仅承载 `block_trading_user_interface`、`block_trading_application`、`block_trading_domain`、`block_trading_infrastructure` 与 `block_trading_system_test` |
+| 前端目标根 | `block_trading_client` | 未创建，不进入 Maven Reactor | R1 管理 Web 移动、小程序与 `block_trading_web_pc_admin`；R3 管理 Android/iOS；R4 管理 `block_trading_web_pc_user` 与平板终端工程 |
+| 部署与运维目标根 | `block_trading_deployment` | 未创建，按实际部署单元增量建立 | 只消费后端 `*_boot` 与前端发布产物，管理部署清单、镜像、环境差异、数据库迁移、发布/回滚脚本和日志归档作业 |
 | 前端原型入口 | `block_trading_docs/产品原型/shadcn-mobile/package.json` | 可执行 Vite 原型 | 作为 Web 移动、小程序、Android 与 iOS 的统一移动交互参考，不等同于生产工程 |
-| 后端外部请求入口 | `quhui_user_interface` Adapter | 后端模块尚未恢复 | HTTP、WebSocket、RPC、文件和第三方回调只能进入 UserInterface |
-| 后端业务启动入口 | `quhui_server` 内具体业务模块的 `*_boot` | 按独立部署需求创建 | 负责本业务单元装配，不建立统一 Runtime |
+| 后端外部请求入口 | `block_trading_user_interface` Adapter | 后端模块尚未恢复 | HTTP、WebSocket、RPC、文件和第三方回调只能进入 UserInterface |
+| 后端业务启动入口 | `block_trading_server` 内具体业务模块的 `*_boot` | 按独立部署需求创建 | 负责本业务单元装配，不建立统一 Runtime |
 
-当前没有可执行后端服务入口。`quhui_system_test` 只负责跨层验证，不能作为生产入口；前端原型也不代表已完成后端服务。`quhui_bom` 是根级依赖/插件版本基线，不含业务代码和运行入口。
+当前没有可执行后端服务入口。`block_trading_system_test` 只负责跨层验证，不能作为生产入口；前端原型也不代表已完成后端服务。`block_trading_bom` 是根级依赖/插件版本基线，不含业务代码和运行入口。
 
 ```mermaid
 flowchart TB
-    subgraph Client[quhui_client]
-        WebMobile[quhui_web_mobile]
-        Mini[quhui_mini_program]
-        NativeMobile[quhui_mobile R3]
-        Android[quhui_mobile_android]
-        IOS[quhui_mobile_ios]
-        WebPc[quhui_web_pc]
-        WebPcAdmin[quhui_web_pc_admin R1 internal]
-        WebPcUser[quhui_web_pc_user R4]
-        Tablet[quhui_tablet R4]
+    subgraph Client[block_trading_client]
+        WebMobile[block_trading_web_mobile]
+        Mini[block_trading_mini_program]
+        NativeMobile[block_trading_mobile R3]
+        Android[block_trading_mobile_android]
+        IOS[block_trading_mobile_ios]
+        WebPc[block_trading_web_pc]
+        WebPcAdmin[block_trading_web_pc_admin R1 internal]
+        WebPcUser[block_trading_web_pc_user R4]
+        Tablet[block_trading_tablet R4]
     end
 
     Edge[API Gateway / BFF\n认证、限流、灰度、审计上下文]
@@ -230,6 +231,15 @@ sequenceDiagram
 - 项目已声明 Spring Boot 4，基线运行时使用 Java 17 或更高版本；实际 minor/patch 版本以发布时的 Spring Cloud Release Train 兼容矩阵为准。
 - Nacos、RabbitMQ、Redis、Oracle、MinIO、OpenSearch 和 ClickHouse 均记录服务端版本、客户端驱动版本、协议兼容范围和升级回滚方案；升级前做事件重放、支付回调、索引重建和备份恢复演练。
 
+### 6.4 部署号、数据库目标与日志生命周期
+
+- 每次部署使用全局唯一且不可复用的 `deployment_no`。部署号只引用经过审批的不可变部署清单；清单固定环境、部署单元、制品摘要、数据库数据源引用、Oracle service/schema、迁移基线、配置版本和密钥引用，不保存 JDBC 明文密码。
+- 自动化脚本必须先按部署号加载清单，再校验环境、集群、命名空间、数据源白名单、目标 schema、制品摘要和迁移校验和。部署号与命令行环境不一致、目标库不可达、schema 不在白名单或迁移基线倒退时必须在变更前失败，禁止通过临时 JDBC 参数绕过。
+- 同一部署号重跑只能继续未完成步骤或返回已成功结果，不得重复执行非幂等迁移。部署、迁移、健康检查和回滚均记录 deployment_no、操作者/流水线、开始结束时间、目标、版本、结果与失败原因。
+- 应用日志采用结构化 JSON，至少包含 timestamp、level、service、environment、deployment_no、node/pod、request_id、trace_id、logger、message 和 error_code；敏感字段在写入前脱敏，不以后台展示时遮盖替代源头脱敏。
+- 在线日志在自然日边界或单文件达到配置大小上限时立即滚动，任一条件先满足即切片；默认单片上限 100 MiB。次月首日对上月已关闭切片按服务和月份归档，生成切片清单、文件大小与 SHA-256 校验值；归档任务可幂等重跑，失败不得删除源切片。
+- 在线保留天数、归档保留月数、单片大小上限和归档目标按环境配置，默认在线 30 天、归档 12 个月；审计、支付、安全事件或法律保留日志按所属数据治理策略延长，清理任务不得越过法律保留与证据保全。
+
 ## 7. 关键基础设施选型
 
 | 能力 | 选型 | 采用原因 | 约束/替代 |
@@ -244,8 +254,8 @@ sequenceDiagram
 | 分析 | ClickHouse（R3 起） | 适合事件明细、区域指标和时间窗口聚合 | R1/R2 先写 Oracle 事件；不把 ClickHouse 当交易源 |
 | 规则/模型编排 | Java 规则评估 + Spring Embabel + 模型适配网关 | R1 规则链可解释，后期可接大模型、风控和推荐模型 | 模型版本、输入摘要、人工覆盖和关闭开关必须落事实表；供应商可替换 |
 | 工作流 | 领域状态机 + Outbox/RabbitMQ | R1/R2 状态数量可控，减少引入新工作流平台 | R3 复杂跨区域长流程达到运维阈值后再评估 Temporal/Camunda，不在 R1 强制引入 |
-| 可观测性 | OpenTelemetry + Prometheus + Grafana | 覆盖请求、事件、队列、数据库和业务指标 | 日志脱敏；指标按区域、版本和业务链路切分；告警需绑定值班与恢复动作 |
-| 部署 | Docker 镜像 + Kubernetes | 支持 R1 小规模多副本和 R2-R4 独立扩缩、灰度与回滚 | 具体业务 `*_boot` 产出可执行 JAR；未来的 `quhui_deployment` 按部署单元管理镜像、环境 overlay、密钥引用、发布与回滚，不因使用 K8s 就拆成大量微服务 |
+| 可观测性 | OpenTelemetry + Prometheus + Grafana + 结构化日志索引 | 覆盖请求、事件、队列、数据库和业务指标，并支持后台按部署号与链路标识追踪 | 写入前脱敏；日志按自然日/大小滚动并按月归档；指标按区域、版本和业务链路切分；告警需绑定值班与恢复动作 |
+| 部署 | Docker 镜像 + Kubernetes + `block_trading_deployment` 脚本 | 支持 R1 小规模多副本和 R2-R4 独立扩缩、灰度、健康验证与回滚 | 具体业务 `*_boot` 产出可执行 JAR；部署号引用不可变清单并决定受控数据库目标，禁止脚本接收任意 JDBC 密钥；不因使用 K8s 就拆成大量微服务 |
 
 ## 8. 核心业务链路设计
 
@@ -305,6 +315,8 @@ sequenceDiagram
 3. 内容和举报可完成规则、大模型、人工三段链；高危审核控制有目标域执行回执或安全降级，Outbox 重复投递不会重复通知或重复审核。
 4. MinIO 媒体经过数据资产登记后才可展示；OpenSearch 召回先受可见性约束、返回前复核，索引延迟或缺失不绕过服务端权限。
 5. 可关闭单一区域、审核类型或异步消费者，并保留恢复条件和失败任务。
+6. 任一 R1 部署都能通过唯一 deployment_no 完成清单校验、数据库目标解析、迁移、发布、健康检查和失败回滚；重跑不产生重复迁移或跨环境写库。
+7. 系统管理员可按时间、级别、服务、deployment_no、关键字、request_id 或 trace_id 查询脱敏日志并查看链路；在线日志在日期或大小阈值触发切片，上月日志可校验地归档且失败不删除源文件。
 
 ### 11.3 R2-R4 扩展验收
 
