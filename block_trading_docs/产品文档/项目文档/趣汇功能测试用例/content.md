@@ -42,6 +42,19 @@
 | R1_RELEASE_001 | region_policy/moderation | 关闭单一区域、审核类型或异步消费者后阻止新高风险动作；已有案件、客服和已提交任务保留可查询的恢复条件与人工收口 | A/U/S | `quhui_a_region_policy_test`、`quhui_ui_admin_gateway_test`、`quhui_system_test` |
 | R1_ACCESS_001 | user_interface | 登录、发布、审核状态、权限不足和失败恢复页面具有可读名称、键盘可达焦点、动态状态播报和非颜色状态表达 | U/S | `quhui_ui_client_gateway_test`、`quhui_system_test` |
 | R1_OBS_001 | observability | 发布、参与、审核和消息链路可通过同一 `request_id` 关联日志、指标、Outbox 和审计；核心错误率或队列积压越阈值产生可执行告警 | I/S | `quhui_i_starter_test`、`quhui_system_test` |
+| R1_REC_001 | discovery/recommendation | 推荐候选先应用校园、地区和拉黑过滤；规则混排满足业务类型与商城占比限制，负反馈立即隐藏内容且撤销窗口恢复同一内容，不重复暴露已隐藏或不可见内容 | D/A/U/S | `quhui_d_visibility_test`、`quhui_a_discovery_test`、`quhui_ui_client_gateway_test`、`quhui_system_test` |
+| R1_REC_002 | user_interface/discovery | 扫码权限拒绝、相机不可用或定位拒绝时释放相机资源并提供手动市区选择；搜索、筛选、刷新和分页失败保留可用内容且不重置已确认的浏览条件 | A/U/S | `quhui_a_discovery_test`、`quhui_ui_client_gateway_test`、`quhui_system_test` |
+| R1_COMMUNITY_005 | community/identity/visibility | 五类帖子仅接受对应结构化字段；草稿和审核失败不占近邻配额，提交后状态从审核中开始；游客近邻互助详情严格按 5 km、公开范围和脱敏字段返回 | D/A/U/S | `quhui_d_community_test`、`quhui_a_community_test`、`quhui_ui_client_gateway_test`、`quhui_system_test` |
+| R1_MESSAGE_001 | engagement/visibility | 系统、业务、用户未读分别统计，只有可视或明确已读才变更；安全/协议确认不能被全部已读绕过，范围或拉黑变更使关联待发通知和摘要失效 | D/A/U/S | `quhui_d_engagement_test`、`quhui_a_engagement_test`、`quhui_ui_client_gateway_test`、`quhui_system_test` |
+| R1_PROFILE_001 | identity/growth_benefits | 签到、邀请、累计积分等级和自然月普通/紧急求助配额按规则结算且可由账本重建；学生信息、资料、隐私偏好和兑换结果只向授权用户展示 | D/A/U/S | `quhui_d_growth_benefits_test`、`quhui_a_growth_benefits_test`、`quhui_ui_client_gateway_test`、`quhui_system_test` |
+| R1_ASSIST_001 | community/assistant | 智能建帖 SSE 回填只更新空字段或本轮 `force` 字段；非 force 的手工值必须提示确认并保留变更记录，草稿预览后仍通过正式字段校验、审核与发布权限控制 | A/U/S | `quhui_a_process_content_publication_test`、`quhui_ui_client_gateway_test`、`quhui_system_test` |
+| R1_UI_002 | user_interface | 五入口切换保留各自滚动与筛选状态，重复当前入口回顶部；详情返回恢复来源列表，加载/空态/失败/权限不足/结束状态提供可执行恢复操作且不遮挡最后一项 | U/S | `quhui_ui_client_gateway_test`、`quhui_system_test` |
+| R1_ID_004 | identity/user_interface | 注册、登录、登出和会话失效遵循一致的身份状态机；注册或登录失败不创建可用会话，登出或令牌撤销后原会话不能继续读取受保护资料、内容或消息 | D/A/U/S | `quhui_d_identity_test`、`quhui_a_identity_test`、`quhui_ui_client_gateway_test`、`quhui_system_test` |
+| R1_COMMUNITY_006 | community/visibility/moderation | 留言、回复及其举报均记录对象关系与审核链；分享深链重新校验可见性，拉黑、范围变更或内容下架后不得访问或泄露原对象摘要 | D/A/U/S | `quhui_d_community_test`、`quhui_a_community_test`、`quhui_ui_client_gateway_test`、`quhui_system_test` |
+| R1_REC_003 | user_interface/engagement | 订单状态轮播按三条分组滚动；触摸、滚轮或键盘手动滚动立即停止自动动画，暂停结束后从当前组恢复，关闭摘要不改变消息未读状态 | U/S | `quhui_ui_client_gateway_test`、`quhui_system_test` |
+| R1_MESSAGE_002 | engagement/user_interface | 私聊、群聊和客服会话发送失败时保留原消息、失败原因和重试入口；活动会话不返回手机号或精确地址，系统状态消息不能伪造成普通用户消息 | D/A/U/S | `quhui_d_engagement_test`、`quhui_a_engagement_test`、`quhui_ui_client_gateway_test`、`quhui_system_test` |
+| R1_PROFILE_002 | identity/growth_benefits | 资料保存校验昵称、用户名和签名边界；兑换码去除首尾空格并按大小写规则校验，已使用、过期、不适用和网络失败均返回可解释状态且不泄露其他账户信息 | D/A/U/S | `quhui_d_growth_benefits_test`、`quhui_a_growth_benefits_test`、`quhui_ui_client_gateway_test`、`quhui_system_test` |
+| R1_ASSIST_002 | user_interface/community | 悬浮助手拖动仅吸附左右边缘且不遮挡导航；收起、展开、菜单外关闭和未完成草稿标记不丢失，进入建帖或客服后按页面层级安全返回 | U/S | `quhui_ui_client_gateway_test`、`quhui_system_test` |
 
 ## 4. R2 单区域交易履约用例
 
@@ -62,6 +75,7 @@
 | R2_ENGAGE_001 | engagement/commerce | 支付、退款、取消和安全通知保存独立投递尝试；站内投递失败时按策略重试、备用触达或进入人工队列，已读不等于送达成功 | A/I/S | `quhui_a_engagement_test`、`quhui_i_plugin_rabbitmq_test`、`quhui_system_test` |
 | R2_GROUP_002 | community/commerce | 拼单资格撤销、库存不足、支付超时或退款完成时，社区只更新可追溯资格投影；不得写入订单金额、支付流水或退款状态 | D/A/I/S | `quhui_d_community_test`、`quhui_a_process_group_buy_settlement_test`、`quhui_i_repository_oracle_test`、`quhui_system_test` |
 | R2_RELEASE_001 | commerce/fulfillment | 资金、履约或内容风险触发区域交易关闭时，停止下单/支付并保留现有订单、退款、售后和客服可用；恢复前验证未处理补偿与队列积压 | A/U/S | `quhui_a_commerce_test`、`quhui_ui_admin_gateway_test`、`quhui_system_test` |
+| R2_MALL_001 | commerce/user_interface | 商品规格切换后的价格、库存和预计发货时间一致；结算前对价格变化二次确认，支付失败保留待支付订单并允许受控重试，售罄与超配送范围不允许创建订单 | D/A/U/S | `quhui_d_commerce_test`、`quhui_a_commerce_test`、`quhui_ui_client_gateway_test`、`quhui_system_test` |
 
 ## 5. R3 跨区域扩张用例
 
@@ -78,6 +92,7 @@
 | R3_GOV_002 | governance | 数据导出/删除请求跨领域执行时逐域记录授权、处理结果和失败原因；法律保留、订单/审计留存冲突时拒绝物理删除并返回可解释状态 | D/A/I/S | `quhui_d_governance_test`、`quhui_a_governance_test`、`quhui_i_repository_oracle_test`、`quhui_system_test` |
 | R3_RECOVERY_001 | governance/infrastructure | 从受控备份恢复后，业务事实、Outbox/Inbox 幂等记录、区域策略版本和对象引用保持一致；恢复演练产生结果、差异和人工签收记录 | A/I/S | `quhui_a_governance_test`、`quhui_i_repository_oracle_test`、`quhui_i_plugin_minio_test`、`quhui_system_test` |
 | R3_INCIDENT_001 | governance/trust_safety | 数据泄露或区域服务故障演练可关闭受影响功能、保全证据、通知责任人并记录恢复步骤；演练不能向真实用户或生产供应商发出通知 | A/I/S | `quhui_a_governance_test`、`quhui_i_starter_test`、`quhui_system_test` |
+| R3_NATIVE_001 | user_interface/identity | Android/iOS 在登录、通知、相机和定位权限被拒绝、撤销或恢复时呈现与 Web 一致的最小可用路径；令牌、敏感缓存和退出登录按终端安全边界清除或失效 | A/U/S | `quhui_a_identity_test`、`quhui_ui_client_gateway_test`、`quhui_system_test` |
 
 ## 6. R4 规模化优化用例
 | R4_MODEL_001 | model_governance | 只有获准入模型可用于业务场景；停用不覆盖已有决策记录 | D/A/I | `quhui_d_model_governance_test`、`quhui_a_model_governance_test`、`quhui_i_plugin_embabel_test` |
@@ -92,6 +107,7 @@
 | R4_BENEFIT_001 | growth_benefits/trust_safety | 积分、优惠和邀请的异常关联命中后冻结可疑奖励而不覆盖不可变账本；人工裁决以冲正或恢复流水处理并防止重复补贴 | D/A/I/S | `quhui_d_growth_benefits_test`、`quhui_a_growth_benefits_test`、`quhui_i_repository_oracle_test`、`quhui_system_test` |
 | R4_IP_002 | moderation/trust_safety | 侵权下架、反通知、恢复或维持下架遵循期限、权限和证据完整性；重复投诉和过期反通知不能改变已生效裁决 | D/A/I/S | `quhui_d_moderation_test`、`quhui_a_trust_safety_test`、`quhui_i_repository_oracle_test`、`quhui_system_test` |
 | R4_RELEASE_001 | model_governance/region_policy | 自动化策略按区域或场景小流量启用；容量、成本、错误率或风险护栏触发时暂停放量、回滚版本并保留未完成用户请求的人工收口 | A/I/S | `quhui_a_process_region_rollout_test`、`quhui_i_starter_test`、`quhui_system_test` |
+| R4_CLIENT_001 | user_interface/visibility | 用户侧 PC 与平板通过版本化接口复用登录、可见性、订单恢复和隐私规则；大屏分屏或高信息密度展示不得扩大字段可见范围，失败恢复与无障碍语义保持一致 | A/U/S | `quhui_a_visibility_test`、`quhui_ui_client_gateway_test`、`quhui_system_test` |
 
 ## 7. 测试数据与隔离
 
