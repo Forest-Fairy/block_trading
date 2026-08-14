@@ -1,2 +1,2 @@
 标题,scope,路径,摘要,状态
-趣汇系统架构设计,项目文档,content.md,定义趣汇 R1-R4 总体架构、block_trading_server/client/deployment 入口边界、领域与数据事件架构、部署号选库、自动发布回滚、日志切片归档、安全治理和技术选型,已规划
+趣汇系统架构设计,项目文档,content.md,定义趣汇 R1-R4 Kotlin/Gradle 总体架构、Jimmer/MyBatis-Flex 组合持久化、Netty 实时通信、稳定 Service 零停机切流、SLO/告警值班、受控数据库迁移、发布回滚、日志归档与安全治理,已规划

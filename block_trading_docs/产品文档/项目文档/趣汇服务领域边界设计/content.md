@@ -47,7 +47,7 @@ flowchart LR
 | `moderation` 审核与申诉 | 核心 | R1 | 举报、审核案件、规则/模型/人工阶段、审核证据、审核申诉、商品合规 | 帖子/商品/账号最终业务状态、推荐排序 |
 | `visibility` 可见性决策 | 核心支撑 | R1 | 可见性规则版本、读取/写入决策、失效任务与权限快照 | 拉黑/认证/帖子状态等原始事实，搜索索引、个性化排序 |
 | `discovery` 发现与排序 | 核心 | R1 | 搜索文档、规则候选、排序策略、内容反馈、推荐候选 | 权限最终裁决、内容或商品主状态 |
-| `engagement` 触达与客服 | 支撑 | R1 | 通知模板/业务通知、收件人、投递尝试、客服工单、SLA | 订单退款裁决、审核结论、聊天内容策略 |
+| `engagement` 触达与客服 | 支撑 | R1 | 通知模板/业务通知、收件人、投递尝试、会话/成员/消息、确认游标、客服工单、SLA | 订单退款裁决、审核结论、聊天内容策略 |
 | `commerce` 商品交易 | 核心 | R2 | 商品/SKU、可售、价格、库存预占、购物车、订单、支付、退款、对账 | 物流节点、履约工单、售后证据、营销实验 |
 | `fulfillment` 履约售后 | 核心 | R2 | 配送、物流节点、异常、履约工单、售后请求/证据、评价争议 | 订单支付主状态、库存扣减、支付对账 |
 | `growth-benefits` 增长与权益 | 支撑 | R1 | 邀请、兑换、会员当前投影、积分/权益账本、近邻配额 | 事件分析、实验曝光、在线鉴权、交易事实 |
@@ -108,11 +108,11 @@ flowchart LR
 
 ### 4.7 `engagement` 触达与客服
 
-- **聚合与写入权：** 业务通知、收件人、关键通知投递尝试、客服工单、SLA、升级与用户消息会话元数据。聊天内容的审核请求通过 `moderation`，不在此领域裁决。
-- **关键不变量：** 通知内容与收件人状态分离；关键通知保留每次渠道投递；工单可关联订单、审核、履约和安全案件，但不替代它们的状态机。
-- **同步 API：** 创建客服工单、查询自身通知/工单、确认关键通知；发送通知为命令接口。
-- **发布事件：** `NotificationDeliveryChanged`、`SupportTicketEscalated`、`SupportTicketResolved`。
-- **边界约束：** 外部发送失败只改变本领域投递状态并触发重试，不能直接变更订单或审核结果。每次投递/内容展示前调用 `visibility` 或保存可解释的发送时权限判断。
+- **聚合与写入权：** 业务通知、收件人、关键通知投递尝试、客服工单、SLA、升级、用户消息会话、成员、消息、消息序号、投递/确认/已读游标。聊天内容的审核请求通过 `moderation`，不在此领域裁决。
+- **关键不变量：** 通知内容与收件人状态分离；关键通知保留每次渠道投递；每个会话的 `message_seq` 单调递增且 `client_message_id` 在发送方会话范围内幂等；`ACCEPTED` 仅代表消息持久化，不代表目标用户已看到；确认游标和已读游标只能前进。工单可关联订单、审核、履约和安全案件，但不替代它们的状态机。
+- **同步 API：** 创建客服工单、查询自身通知/工单、确认关键通知；发送通知、创建/加入会话、`sendMessage`、`ackMessage`、`markRead` 和 `resumeMessages` 为版本化命令/查询接口。
+- **发布事件：** `NotificationDeliveryChanged`、`ConversationMessageAccepted`、`ConversationMessageDelivered`、`ConversationReadCursorAdvanced`、`SupportTicketEscalated`、`SupportTicketResolved`。
+- **边界约束：** Netty Gateway 只作为外部连接适配器，不拥有会话或消息事实；外部发送失败只改变本领域投递状态并触发重试，不能直接变更订单或审核结果。每次发送、投递、补拉和内容展示前调用 `visibility`，并执行 identity/trust-safety 的会话限制；连接断开或跨节点投递失败后通过 `message_seq` 和确认游标补拉，不能依赖节点内存恢复。
 
 ### 4.8 `commerce` 商品交易
 
@@ -181,6 +181,7 @@ flowchart LR
 | 拼单结算 | commerce 流程 | community 资格、region-policy、库存预占、trust-safety 动作限制 | 订单/预占/支付/退款/Outbox | `PostQualified -> ReservationCreated -> PaymentSucceeded | SettlementFailed -> RefundCompleted` 驱动 community 参与资格投影 |
 | 下单支付 | commerce | identity、region-policy、库存预占、trust-safety 动作限制 | 订单/支付/库存/本域 ContextSnapshot/Outbox | fulfillment 创建履约；engagement 关键通知；analytics 统计 |
 | 物流异常/售后 | fulfillment | commerce 订单视图、region-policy 责任路由 | 物流/异常/售后/证据 | `FulfillmentStatusReported` 使 commerce 幂等更新订单履约投影；commerce 执行退款；engagement 通知；support 工单升级 |
+| 会话发送/重连补拉 | engagement | identity、visibility、trust-safety 的当前限制；Netty Gateway 仅协议适配 | 会话、成员、消息、`message_seq`、投递/确认/已读游标、Outbox | Netty 节点根据 Redis 连接路由投递；离线、投递失败或发布摘流时客户端以 `RESUME` 补拉；moderation 审核消息内容 |
 | 封禁处置 | trust-safety | identity/commerce 的受限能力视图 | 案件/证据/审批 | identity/community/commerce 执行各自限制；governance 法律保留 |
 | 数据删除请求 | governance | identity 主体验证、法律保留判断 | 请求/审计 | 各事实领域执行本域匿名化/导出并回传证据 |
 

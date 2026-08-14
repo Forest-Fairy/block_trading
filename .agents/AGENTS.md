@@ -146,13 +146,18 @@
 ## 实体设计
 - 实体设计统一以ORACLE规范完成
 - 实体中的外键不需要在数据库中创建外键约束, 而是应用层完成外键约束
+- 所有环境禁止 ORM 根据实体自动创建、修改、删除或同步表结构；不得启用 Hibernate、Jimmer、MyBatis-Flex 或其他框架的运行时 DDL/自动同步功能。
+- AI 修改实体、Jimmer 定义、MyBatis-Flex 映射或 Repository 且涉及数据库结构时，必须在同一变更中更新数据库设计文档、提交版本化正向迁移、标注迁移风险级别并补充验证；实体差异不能替代迁移脚本或审批。
+- 数据库迁移风险级别只能使用 `ADDITIVE`（新增兼容结构）、`TRANSITIONAL`（扩展、回填、切换、清理的多阶段变更）或 `DESTRUCTIVE`（删除、收窄或不可逆变更）。`TRANSITIONAL` 与 `DESTRUCTIVE` 迁移必须具备审批、兼容性验证及备份/恢复证据后才可发布。
+- 一个领域聚合只对 Application 暴露一个 Repository 接口；其 Infrastructure 实现可组合 Jimmer 与 MyBatis-Flex DAO。组合实现必须使用同一个数据源和 Spring 本地事务，为每个业务状态字段、乐观锁版本、审计流水和 Outbox 明确唯一写入 DAO；MyBatis-Flex 写入影响 Jimmer 缓存时，必须在事务提交后显式失效缓存。ORM Entity、Mapper、DAO 类型不得传入或传出 Domain/Application。
 
 ## DDD 服务与启动模块规则
 
-- Maven Reactor 只按 `UserInterface`、`Application`、`Domain`、`Infrastructure` 四个 DDD 层组织生产代码；禁止建立跨领域的统一 `Runtime` 层或 `统一 Runtime` 聚合。
+- Gradle Build 只按 `UserInterface`、`Application`、`Domain`、`Infrastructure` 四个 DDD 层组织生产代码；后端生产模块只能使用根 Gradle Wrapper、`settings.gradle.kts` 和 Version Catalog，禁止并行维护 Maven 后端构建，也禁止建立跨领域的统一 `Runtime` 层或 `统一 Runtime` 聚合。
 - 独立运行是部署单元的属性，不是每个 DDD 层父模块的强制属性。需要独立部署的具体业务模块，才在所属层级内部创建对应的 `*_boot` 模块作为组合根；未确认部署边界和测试准入前，不创建空的 Boot 模块。
 - `*_boot` 只负责启动、依赖注入、Adapter 选择、配置绑定、健康检查和可执行产物生成；不得承载领域规则，也不得成为跨领域业务逻辑的集中入口。部署脚本和环境资产归 `block_trading_deployment`，不放入 Boot 或领域模块。
 - 外部 HTTP、WebSocket、RPC、文件或第三方回调请求只能进入 `UserInterface` Adapter；不得直接访问 Application 实现、Domain 实现、Repository 或 Infrastructure。
+- Netty 只允许作为 `UserInterface` 的实时 Gateway 实现；Handler 只能调用版本化 Application API，不能直接访问 Mapper、DAO、Oracle、Redis 或 RabbitMQ。长连接发布通过稳定 Service 切流、摘流和 `DRAIN -> RESUME` 恢复，不修改运行中容器端口映射，也不承诺跨实例迁移连接。
 - Application 可以被 UserInterface、内部任务或其他受控应用 Adapter 调用，但只能依赖公开 API 和端口。Domain 之间禁止依赖彼此的具体实现或数据库表。
 - 不同领域之间按部署关系选择通信方式：同一进程使用版本化 API 的进程内 Adapter；不同服务使用 REST/Feign 等同步协议；可靠异步协作用本域 Outbox、版本化事件和消费方 Inbox。通信方式由具体 Boot 或 Adapter 选择，不由 Domain 代码决定。
 - `block_trading_system_test` 只承担跨层、跨领域和启动装配验证，不得为了运行测试重新引入统一 Runtime；测试可以在测试代码中组装多个层的实现。

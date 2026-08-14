@@ -1,2 +1,2 @@
 标题,scope,路径,摘要,状态
-趣汇 DDD、六边形与 TDD 模块规划,项目文档,content.md,定义 block_trading 根下 docs/bom/server/client/deployment，规划后端四层、测试父模块、多端客户端、业务 Boot、部署号清单与自动发布回滚脚本；禁止统一 Runtime,已规划
+趣汇 DDD、六边形与 TDD 模块规划,项目文档,content.md,定义 Kotlin/Gradle 多项目构建、后端四层、Netty 实时 Gateway、Jimmer/MyBatis-Flex 组合 Repository、测试父模块、多端客户端、业务 Boot 与零停机发布脚本；禁止统一 Runtime,已规划

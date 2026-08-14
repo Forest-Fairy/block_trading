@@ -12,12 +12,13 @@
 
 | 类别 | 已确定技术 | 架构使用口径 |
 |---|---|---|
-| 后端 | Spring Boot 4、Spring Cloud、Spring Embabel、MyBatis-Flex | Java 服务基线；Spring Cloud 只承担服务治理能力，不替代领域边界；Embabel 作为模型/智能流程编排适配层 |
+| 后端 | Kotlin、Gradle Kotlin DSL、Spring Boot 4、Spring Cloud、Spring Embabel、Jimmer、MyBatis-Flex | Kotlin 是后端默认语言；Gradle 是后端唯一权威多项目构建；Jimmer 与 MyBatis-Flex 仅在 Infrastructure 组合；Spring Cloud 只承担服务治理能力，不替代领域边界；Embabel 作为模型/智能流程编排适配层 |
 | 前端 | Vite、React、UniApp | Web、Mobile、Micro-app 共用 API 契约；运营后台与用户端前端独立构建 |
 | 数据库 | Oracle | 交易、治理、权限、订单、审核和审计事实的权威存储；按领域逻辑分 schema/表前缀，不跨领域写表 |
 | 配置与发现 | Nacos | 配置、服务发现和动态开关；高风险配置必须有版本、审批、生效时间和回滚记录 |
 | 缓存与短状态 | Redis | 会话、限流、幂等键、分布式锁、缓存和派生状态；不保存唯一业务事实 |
 | 消息 | RabbitMQ | 领域事件、Outbox 投递、异步审核、通知、库存/物流回调和重试；消费者必须幂等 |
+| 实时连接 | Netty | WebSocket 长连接、心跳、连接级限流和协议编解码；连接层只作 UserInterface 协议适配，不保存领域事实 |
 | 对象存储 | MinIO | 媒体、审核证据、售后材料和导出文件；通过数据资产实体、摘要、权限和签名 URL 管理 |
 
 ### 2.2 目标
@@ -35,8 +36,8 @@
 | 入口类型 | 当前入口 | 当前状态 | 允许访问的边界 |
 |---|---|---|---|
 | Maven 构建入口 | 根目录 `pom.xml` | 当前只聚合 `block_trading_docs` | 文档构建与校验 |
-| 后端目标根 | `block_trading_server` | 未创建，未来由根 Maven Reactor 聚合 | 仅承载 `block_trading_user_interface`、`block_trading_application`、`block_trading_domain`、`block_trading_infrastructure` 与 `block_trading_system_test` |
-| 前端目标根 | `block_trading_client` | 未创建，不进入 Maven Reactor | R1 管理 Web 移动、小程序与 `block_trading_web_pc_admin`；R3 管理 Android/iOS；R4 管理 `block_trading_web_pc_user` 与平板终端工程 |
+| 后端目标根 | `block_trading_server` | 未创建，未来由根 Gradle Build 聚合 | 仅承载 `block_trading_user_interface`、`block_trading_application`、`block_trading_domain`、`block_trading_infrastructure` 与 `block_trading_system_test` |
+| 前端目标根 | `block_trading_client` | 未创建，不进入 Gradle Build | R1 管理 Web 移动、小程序与 `block_trading_web_pc_admin`；R3 管理 Android/iOS；R4 管理 `block_trading_web_pc_user` 与平板终端工程 |
 | 部署与运维目标根 | `block_trading_deployment` | 未创建，按实际部署单元增量建立 | 只消费后端 `*_boot` 与前端发布产物，管理部署清单、镜像、环境差异、数据库迁移、发布/回滚脚本和日志归档作业 |
 | 前端原型入口 | `block_trading_docs/产品原型/shadcn-mobile/package.json` | 可执行 Vite 原型 | 作为 Web 移动、小程序、Android 与 iOS 的统一移动交互参考，不等同于生产工程 |
 | 后端外部请求入口 | `block_trading_user_interface` Adapter | 后端模块尚未恢复 | HTTP、WebSocket、RPC、文件和第三方回调只能进入 UserInterface |
@@ -149,6 +150,14 @@ sequenceDiagram
 
 同步请求只负责完成本领域必须立即确认的状态；跨域通知、搜索索引、模型审核、物流节点、指标计算和缓存失效走事件。任何消费者重复、乱序或延迟都不能覆盖已确认的事实状态。
 
+### 3.3 实时通信与会话边界
+
+Netty 作为 `block_trading_ui_realtime_gateway` 的唯一长连接框架，只承接 WebSocket 升级、TLS/协议编解码、令牌校验、设备会话绑定、心跳、单连接限流、连接登记、摘流通知和客户端重连指令。每个 Channel Pipeline 必须按“协议校验 -> 身份与设备绑定 -> 频控 -> 命令/确认分发 -> 心跳与异常关闭”分层；Netty Handler 不得直接调用 Mapper、DAO 或跨领域表。
+
+连接建立、发送、确认、已读、拉黑/禁言/权限变更和重连恢复均转为版本化 Application API。`engagement` 持有会话、成员、消息、投递、已读游标和消息序号的领域事实，`moderation` 裁决消息内容，`identity` 与 `trust-safety` 决定账号/设备限制，`visibility` 在发送、投递和恢复前复核对话双方的可见性。Netty 节点只保存可丢失的 `connection_id -> node/channel` 短状态；跨节点在线投递通过 Redis 路由索引与 RabbitMQ 事件协作，离线、跨节点失败或重连场景一律以 Oracle 中按会话单调递增的 `message_seq` 和客户端确认游标补拉，不以 Channel 内存作为消息事实。
+
+实时协议的命令类型为封闭枚举：`AUTH`（认证/续期）、`PING`（心跳）、`SEND`（提交待发送消息）、`ACK`（确认收到指定 `message_seq`）、`READ`（更新已读游标）、`RESUME`（按会话和游标补拉）、`DRAIN`（服务端要求客户端在抖动退避后重连）、`ERROR`（受控失败）。消息投递结果为封闭枚举：`ACCEPTED`（服务端已持久化）、`DELIVERED`（已写入目标连接）、`ACKED`（客户端已确认）、`OFFLINE`（等待补拉）、`REJECTED`（鉴权、频控、内容或会话限制拒绝）。`SEND` 必须携带 `client_message_id` 作为幂等键；`ACCEPTED` 不能承诺对端已展示，`ACKED` 不能替代已读事实。
+
 ## 4. 领域边界与模块职责
 
 | 领域模块 | 核心职责 | 主要实体 | 首次发布 | 后续扩展 |
@@ -196,7 +205,7 @@ sequenceDiagram
   adapter/
     in/web/              REST 控制器、请求校验、DTO
     in/message/          RabbitMQ 消费者、重试与死信
-    out/persistence/     MyBatis-Flex Mapper/Repository 实现
+    out/persistence/     组合 Jimmer DAO / MyBatis-Flex Mapper 的 Repository 实现
     out/messaging/       Outbox 发布、事件序列化
     out/provider/        支付、物流、短信、模型等外部适配器
   infrastructure/
@@ -225,10 +234,10 @@ sequenceDiagram
 - R3 为事件、通知投递、审计、物流和数据请求建立保留策略、归档表与冷热分层；灾备恢复必须可演练。
 - R4 风险图谱和模型决策不写入交易主表；敏感输入使用摘要、加密引用或 MinIO 受控对象。
 
-### 6.3 版本兼容矩阵
+### 6.3 构建与版本兼容矩阵
 
-- Spring Boot、Spring Cloud、Spring Framework、Spring Security、MyBatis-Flex 和 Embabel 必须通过 Maven/Gradle BOM 统一锁定；不得单独升级 Spring Cloud 子组件。
-- 项目已声明 Spring Boot 4，基线运行时使用 Java 17 或更高版本；实际 minor/patch 版本以发布时的 Spring Cloud Release Train 兼容矩阵为准。
+- 后端使用一个 `settings.gradle.kts` 管理 Gradle 多项目构建，使用 Gradle Wrapper、Version Catalog 和 `block_trading_bom` Java Platform 统一锁定 Kotlin、KSP、Spring Boot、Spring Cloud、Spring Framework、Spring Security、Jimmer、MyBatis-Flex、Netty 与测试插件；不得通过子模块浮动版本或单独升级 Spring Cloud 子组件。
+- Kotlin/JVM、Java 编译任务和测试任务必须使用同一 Java Toolchain，基线为 Java 17 或更高版本；实际 Kotlin、Gradle、Spring Boot 与 Spring Cloud minor/patch 版本以发布时兼容矩阵为准。当前仅有文档 Maven 入口；创建任一后端生产模块前必须将根构建一次性迁移为 Gradle，不能并行维护 Maven 与 Gradle 两套后端依赖权威。
 - Nacos、RabbitMQ、Redis、Oracle、MinIO、OpenSearch 和 ClickHouse 均记录服务端版本、客户端驱动版本、协议兼容范围和升级回滚方案；升级前做事件重放、支付回调、索引重建和备份恢复演练。
 
 ### 6.4 部署号、数据库目标与日志生命周期
@@ -240,13 +249,40 @@ sequenceDiagram
 - 在线日志在自然日边界或单文件达到配置大小上限时立即滚动，任一条件先满足即切片；默认单片上限 100 MiB。次月首日对上月已关闭切片按服务和月份归档，生成切片清单、文件大小与 SHA-256 校验值；归档任务可幂等重跑，失败不得删除源切片。
 - 在线保留天数、归档保留月数、单片大小上限和归档目标按环境配置，默认在线 30 天、归档 12 个月；审计、支付、安全事件或法律保留日志按所属数据治理策略延长，清理任务不得越过法律保留与证据保全。
 
+### 6.5 数据库结构变更规则
+
+所有环境均禁止 ORM 根据实体映射在应用启动或运行期间自动创建、修改、删除或同步 Oracle schema；`ddl-auto`、实体自动更新和运行时 DDL 生成功能必须保持关闭。实体代码不是数据库结构变更的执行入口，AI 生成或修改实体、Jimmer 定义、MyBatis-Flex 映射与 Repository 时同样受此约束。
+
+数据库结构变更的唯一交付单元是版本化迁移：先更新所属产品/数据库设计文档，再在 `block_trading_deployment` 中提交带唯一迁移版本、校验和、目标 schema 和正向 DDL 的迁移资产，随后修改实体映射和仓储适配器，并补充迁移前后兼容、回滚或恢复路径的测试。部署脚本只能执行部署清单中 `migration_baseline` 至 `migration_target` 的已审核迁移，禁止根据当前实体差异临时生成 DDL。
+
+变更风险级别为封闭枚举：`ADDITIVE`（新增且不影响旧版本读写的表、可空列、索引或约束）、`TRANSITIONAL`（需经过“扩展 -> 双读写/回填 -> 切换 -> 清理”多版本发布的改名、默认值、数据回填或语义调整）、`DESTRUCTIVE`（删除表/列/索引、收窄类型、收紧非空或唯一约束，以及不可逆数据转换）。`ADDITIVE` 迁移必须可幂等并验证旧制品兼容；`TRANSITIONAL` 必须记录阶段、回填批次、数据校验和旧版本下线证据；`DESTRUCTIVE` 必须在依赖旧结构的制品全部下线、备份和恢复演练完成、人工审批通过后才可执行，且不得与首次写入新结构的应用制品合并为同一不可回退步骤。
+
+### 6.6 零停机发布与连接排空
+
+对外端口由稳定 Kubernetes Service、Ingress/Gateway 路由和证书终止层持有；新服务实例使用内部容器端口加入独立 `BLUE` 或 `GREEN` 槽位，绝不在运行中通过脚本修改容器端口绑定。脚本在新槽位通过启动探针、就绪探针、契约冒烟、数据库兼容校验和容量校验后，才原子更新稳定 Service 的 Selector 或 Gateway 后端权重；因此新实例无需重启，旧实例也不会因端口替换而抢占监听地址。
+
+发布策略为封闭枚举：`ROLLING`（同一 Deployment 按 `maxUnavailable=0`、`maxSurge>=1` 更新）、`BLUE_GREEN`（新旧槽位并存，稳定 Service 一次切流）和 `CANARY`（按已审批权重逐级放量）。涉及数据库迁移、协议重大版本、Netty Gateway 或连接数较高的单元默认使用 `BLUE_GREEN`。切流前新槽位必须已连续满足最小就绪时间；切流后旧槽位立即拒绝新 HTTP/WebSocket 连接，保留已进入的短请求直到完成，并对长连接发送 `DRAIN`。客户端以抖动退避重连并通过 `RESUME` 按确认游标恢复；超过受控排空时限仍未结束的连接才由旧槽位关闭。任何活跃 TCP/WebSocket 连接均不承诺跨实例迁移。
+
+回滚仅在旧槽位仍健康、数据库迁移保持向后兼容且新槽位尚未执行 `DESTRUCTIVE` 迁移时，将稳定 Service 流量切回旧槽位；否则只允许应用级降级、修复版本前滚或已验证的数据恢复方案。部署记录必须保存新旧槽位、Service/Gateway 路由版本、就绪时间、切流时间、连接数、排空耗时、强制关闭数和回滚证据。
+
+### 6.7 运行可观测性与事故响应基线
+
+运行指标只按 `service`、`environment`、`deployment_no`、`region_code`、`operation`、`result` 和经登记的低基数错误码聚合；`user_id`、手机号、会话 ID、`request_id`、`trace_id`、消息正文和异常原文不得作为 Metrics label。日志和 Trace 保留请求级关联能力，但进入指标前必须去标识化，避免高基数标签、敏感数据或采样失真使监控系统本身不可用。
+
+R1 受控内测的服务等级目标以连续 30 个自然日为统计窗口：面向用户或后台的 HTTP 成功率不低于 `99.5%`（有效请求中 5xx 与明确记录的服务端超时计为失败，4xx 不计入）；HTTP 服务端 `p95` 时延不高于 `800 ms`；实时 Gateway 的认证后连接建立或 `RESUME` 成功率不低于 `99.5%`；异步关键队列最老未处理消息年龄不高于 `5 min`。外部供应商故障仍需计入用户体验指标，但可在事故复盘中单独归因；计划维护窗口、统计查询、标签基数上限和各阈值配置版本必须绑定 `deployment_no` 留存。
+
+告警严重度为封闭枚举：`P1`（核心入口不可用、数据安全/完整性风险或受控内测全局阻断，15 分钟内确认并在 60 分钟内完成止损或升级）、`P2`（SLO 消耗异常、关键队列积压、发布后错误率升高或长连接恢复失败，30 分钟内确认并在 4 小时内缓解）、`P3`（容量趋势、单节点或非关键降级，工作时间内受理并排入修复）。每条告警必须关联仪表盘、Runbook、责任角色、去重键、触发/恢复条件和证据链接；没有恢复条件或处置路径的阈值不得进入生产通知。
+
+事故状态为封闭枚举：`OPEN`（告警已建档，初始值）、`ACKNOWLEDGED`（值班已确认）、`MITIGATING`（正在止损或恢复）、`RESOLVED`（服务恢复终态）和 `REVIEWED`（复盘确认终态）。允许迁移为 `OPEN -> ACKNOWLEDGED -> MITIGATING -> RESOLVED -> REVIEWED`，任意未终态状态可在证据充分时进入 `RESOLVED`；恢复通知、操作时间线、deployment_no、影响范围和复盘结论必须与事故记录关联。值班主责负责确认与首轮处置，事故指挥负责跨团队升级和发布决策，领域负责人负责业务降级或数据补偿，系统管理员负责基础设施与证据保全；角色可由同一人临时兼任，但事故记录必须明确实际责任人。
+
 ## 7. 关键基础设施选型
 
 | 能力 | 选型 | 采用原因 | 约束/替代 |
 |---|---|---|---|
 | API 接入 | Spring Cloud Gateway + REST/OpenAPI | 统一认证、限流、灰度、请求 ID 和区域上下文 | 不在 Gateway 实现业务权限；高风险后台 API 仍由服务端领域鉴权 |
 | 服务治理 | Nacos | 与现有栈一致，提供配置、发现和动态开关 | 配置必须版本化、审批、审计和回滚；密钥不放普通配置 |
-| 持久化 | Oracle + MyBatis-Flex | 交易可靠性、审计和既有实体设计一致；MyBatis-Flex 保持 SQL 可控 | 领域层不依赖 Mapper；分析查询与在线交易查询隔离 |
+| 持久化 | Oracle + Jimmer / MyBatis-Flex | 交易可靠性、审计和既有实体设计一致；Jimmer 支持类型化关联读取，MyBatis-Flex 保持 SQL 可控 | 每个领域只暴露一个 Repository Port；其基础设施实现可组合两个框架 DAO，但必须统一事务、写入责任、版本锁、缓存失效和 Outbox；领域层不依赖 ORM 类型；所有环境禁用实体自动 DDL，结构变更只走已审核迁移 |
+| 实时通信 | Netty WebSocket Gateway + Redis/RabbitMQ 路由 | 连接处理与领域事实解耦，支持多节点连接路由、心跳、重连恢复和连接级背压 | Netty 只在 UserInterface 层；会话/消息/游标在 Oracle，在线连接索引在 Redis，跨节点投递可失败且必须由 `message_seq` 补拉收敛 |
 | 缓存/并发 | Redis | TTL、原子计数、分布式锁、限流和幂等实现成熟 | 锁必须有超时和补偿；库存最终以 Oracle 事实校验 |
 | 事件总线 | RabbitMQ | 已在项目栈内，适合审核、通知、索引、支付/物流回调和重试 | 使用 Outbox；按领域 exchange/routing key；失败进入死信队列 |
 | 对象存储 | MinIO | 自建环境适配媒体和证据；支持生命周期和签名访问 | 原始对象不直接暴露；病毒扫描、内容摘要和权限检查前置 |
@@ -255,7 +291,7 @@ sequenceDiagram
 | 规则/模型编排 | Java 规则评估 + Spring Embabel + 模型适配网关 | R1 规则链可解释，后期可接大模型、风控和推荐模型 | 模型版本、输入摘要、人工覆盖和关闭开关必须落事实表；供应商可替换 |
 | 工作流 | 领域状态机 + Outbox/RabbitMQ | R1/R2 状态数量可控，减少引入新工作流平台 | R3 复杂跨区域长流程达到运维阈值后再评估 Temporal/Camunda，不在 R1 强制引入 |
 | 可观测性 | OpenTelemetry + Prometheus + Grafana + 结构化日志索引 | 覆盖请求、事件、队列、数据库和业务指标，并支持后台按部署号与链路标识追踪 | 写入前脱敏；日志按自然日/大小滚动并按月归档；指标按区域、版本和业务链路切分；告警需绑定值班与恢复动作 |
-| 部署 | Docker 镜像 + Kubernetes + `block_trading_deployment` 脚本 | 支持 R1 小规模多副本和 R2-R4 独立扩缩、灰度、健康验证与回滚 | 具体业务 `*_boot` 产出可执行 JAR；部署号引用不可变清单并决定受控数据库目标，禁止脚本接收任意 JDBC 密钥；不因使用 K8s 就拆成大量微服务 |
+| 部署 | Docker 镜像 + Kubernetes + `block_trading_deployment` 脚本 | 支持 R1 小规模多副本和 R2-R4 独立扩缩、稳定 Service 切流、灰度、健康验证、连接排空与回滚 | 具体业务 `*_boot` 产出可执行 JAR；禁止修改运行中容器端口映射；部署号引用不可变清单并决定受控数据库目标，禁止脚本接收任意 JDBC 密钥；不因使用 K8s 就拆成大量微服务 |
 
 ## 8. 核心业务链路设计
 
@@ -294,7 +330,7 @@ sequenceDiagram
 
 | 周期 | 架构落地 | 不提前建设 |
 |---|---|---|
-| R1 | UserInterface 入口、模块化单体、Oracle/Redis/RabbitMQ/MinIO、OpenSearch 基础索引；仅对 R1 已启用领域建设 ContextSnapshot/Outbox/Inbox、召回前可见性、审核控制回执与安全降级、后台 RBAC、增长权益账本、审核模型目录、OpenTelemetry；仅为已确认的独立部署单元创建所属业务 `*_boot` 与部署资产 | 真实支付、区域库存扣减、个性化模型、分级封禁、复杂工作流平台，以及 R2-R4 未启用领域的空模块、消费者、专用存储和部署清单 |
+| R1 | UserInterface 入口、模块化单体、Oracle/Redis/RabbitMQ/MinIO、OpenSearch 基础索引；仅对 R1 已启用领域建设 ContextSnapshot/Outbox/Inbox、召回前可见性、审核控制回执与安全降级、后台 RBAC、增长权益账本、审核模型目录、OpenTelemetry、六类运行仪表盘、SLO 采集、P1-P3 告警与演练 Runbook；仅为已确认的独立部署单元创建所属业务 `*_boot` 与部署资产 | 真实支付、区域库存扣减、个性化模型、分级封禁、复杂工作流平台，以及 R2-R4 未启用领域的空模块、消费者、专用存储和部署清单 |
 | R2 | 交易/履约模块独立扩缩选项、拼单结算桥接、支付回调/对账、区域可售与库存、物流接入、履约状态回传、售后证据、关键通知送达、补偿任务和交易看板；按需新增 commerce/fulfillment 部署资产 | 多区域共享库存、第三方商家、复杂优惠券、自动化风控决策 |
 | R3 | 审批后的区域配置模板、灰度、ClickHouse 指标、实验曝光/分桶、触达频控、数据主体请求、留存、法律保留、备份恢复演练；按需新增 analytics/discovery 部署资产 | 全国复杂定价、开放商家、完全自动审核、不可解释画像 |
 | R4 | 风控/推荐/模型网关独立扩展、封禁案件和申诉、关联图谱、模型审计、侵权流程与实验护栏；按需新增 trust_safety 部署资产 | 未经独立评审的直播、竞价、复杂营销叠加和开放式群聊 |
@@ -307,6 +343,10 @@ sequenceDiagram
 - 事件不是状态替代品：订单、审核、支付、库存和封禁主状态由所属领域维护，事件用于传播和追加处理事实。
 - 搜索、推荐、缓存、ClickHouse 和模型服务均为派生能力；搜索/推荐必须在召回前获得可见性约束、返回前复核，任何读模型不可作为权限或交易最终依据。
 - 所有扩容或拆服务都必须保持业务 ID、事件 ID、幂等键、快照引用和审计查询兼容。
+- 每个领域聚合对应用层只暴露一个 Repository Port。该 Port 的 Infrastructure 实现可以组合 Jimmer DAO 与 MyBatis-Flex DAO：两者必须加入同一个 Oracle 数据源和 Spring 本地事务；每个业务状态字段、乐观锁版本和审计流水只能有一个明确 DAO 写入责任；经 MyBatis-Flex 修改的数据若存在 Jimmer 缓存，必须在同一事务提交后失效相关缓存；Outbox 在该事务内只写入一次并记录唯一 `event_id`。不得将 ORM Entity、Mapper 或 DAO 类型泄露到 Domain/Application。
+- Kotlin 是新增后端代码的默认语言；Jimmer Entity、KSP 生成类型、MyBatis-Flex Mapper 和 Netty Channel 均局限于对应 Infrastructure/UserInterface Adapter，不能出现在 Domain/Application API。后端构建只能由 Gradle Wrapper 进入，禁止为同一生产模块同时维护 Maven POM。
+- Netty Gateway 仅维护连接协议与短状态；任何发送、确认、补拉、已读和会话限制必须调用版本化 Application API。连接摘流不是消息丢弃：发布时拒绝新连接、通知旧连接重连并按 `message_seq` 恢复，消息事实和 Outbox 不依赖单节点内存。
+- AI 修改持久化实体、Jimmer 定义、MyBatis-Flex 映射或 Repository 时，必须同时提交对应的数据库设计文档、版本化迁移资产和迁移验证；不得启用 ORM 自动同步表结构，也不得以实体差异替代迁移审查。
 
 ### 11.2 R1 架构验收
 
@@ -317,6 +357,9 @@ sequenceDiagram
 5. 可关闭单一区域、审核类型或异步消费者，并保留恢复条件和失败任务。
 6. 任一 R1 部署都能通过唯一 deployment_no 完成清单校验、数据库目标解析、迁移、发布、健康检查和失败回滚；重跑不产生重复迁移或跨环境写库。
 7. 系统管理员可按时间、级别、服务、deployment_no、关键字、request_id 或 trace_id 查询脱敏日志并查看链路；在线日志在日期或大小阈值触发切片，上月日志可校验地归档且失败不删除源文件。
+8. 任一实体、Jimmer 定义或 MyBatis-Flex 映射变更均不会在运行期生成 DDL；对应迁移版本、校验和、风险级别、兼容测试和恢复证据缺失时，构建或部署校验必须阻断发布。
+9. `BLUE_GREEN` 发布中新槽位通过就绪与冒烟后才可切换稳定 Service；HTTP 请求排空、WebSocket `DRAIN -> RESUME`、连接超时关闭、旧槽位回退和指标审计均有自动化验证，端口映射变更或新服务重启不作为切流手段。
+10. R1 的可观测性采集不含用户、会话、请求或正文等高基数/敏感 Metrics label；HTTP、实时连接、队列、数据库、部署和业务保护仪表盘均能按服务、环境和部署号定位，SLO、告警、值班处置和复盘记录可追溯。
 
 ### 11.3 R2-R4 扩展验收
 

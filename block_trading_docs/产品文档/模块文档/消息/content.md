@@ -56,6 +56,14 @@
 
 底部消息徽标为三类未读总和；超过 99 显示 `99+`。进入分类不等于全部已读，只有内容进入可视区域或用户执行全部已读后才更新状态。
 
+## 实时通信与恢复
+
+私聊、活动群聊和需要即时表现的通知由 Netty WebSocket Gateway 接入；Gateway 仅负责连接、认证、心跳、限流、协议编解码、摘流通知和消息分发，不直接保存消息或改变会话状态。会话、成员、消息、确认和已读事实均由 engagement 服务持久化，发送成功以服务端返回 `ACCEPTED` 为准，不以客户端已写入 Socket 为准。
+
+实时协议命令的允许值为：`AUTH`（认证/续期）、`PING`（心跳）、`SEND`（发送）、`ACK`（确认接收）、`READ`（更新已读）、`RESUME`（按游标补拉）、`DRAIN`（服务端要求重连）、`ERROR`（失败）。客户端发送 `SEND` 必须携带稳定 `client_message_id`；服务端为每个会话分配单调递增 `message_seq`，客户端断线、跨节点投递失败或服务发布摘流后使用最后确认游标发送 `RESUME`，按序补拉未确认消息。客户端在收到 `DRAIN` 后停止发起新业务消息，随机退避后建立新连接并恢复；未完成发送按相同 `client_message_id` 重试，不得制造重复消息。
+
+发送/投递结果允许值为：`ACCEPTED`（已持久化）、`DELIVERED`（已写入当前目标连接）、`ACKED`（目标连接确认）、`OFFLINE`（待补拉）、`REJECTED`（权限、频控、内容或会话限制拒绝）。`ACCEPTED`、`DELIVERED`、`ACKED` 依次表达不同事实，UI 不得将前一状态展示为后一状态；被拉黑、禁言、封禁或审核拦截时，服务端拒绝发送、投递和补拉，并保留页面要求的受限说明。
+
 ## 页面状态
 
 | 状态 | 页面表现 |
@@ -66,3 +74,13 @@
 | 离线 | 展示缓存消息，恢复网络后同步发送状态 |
 | 通知详情为空 | 保留返回入口和分类说明，展示空状态 |
 | 群聊受限 | 显示禁言、已解散或权限不足原因，并保留历史消息 |
+
+## 功能接口
+
+### web 接口
+
+| 接口名 | 接口路径 | 接口类型 | 参数及说明 | 对应的代码文件和方法名 | 参数示例 | 返回值示例 |
+|---|---|---|---|---|---|---|
+| 实时会话连接 | `/api/client/v1/realtime` | WebSocket | `AUTH` 首帧携带访问令牌、设备 ID、协议版本；后续仅允许已登记命令类型 | `block_trading_ui_realtime_gateway` 待实现 | `{"type":"AUTH","token":"<short-lived-token>","deviceId":"d-01"}` | `{"type":"AUTH","result":"ACCEPTED","connectionId":"c-01"}` |
+| 发送会话消息 | 同一 WebSocket | 消息命令 | `SEND` 必填 conversationId、clientMessageId、payload；服务端校验成员、拉黑、禁言、频控与内容策略 | `RealtimeGateway -> engagement.sendMessage` 待实现 | `{"type":"SEND","conversationId":"r-01","clientMessageId":"m-c-01","payload":{"kind":"TEXT","text":"hi"}}` | `{"type":"SEND","result":"ACCEPTED","messageSeq":42}` |
+| 恢复会话消息 | 同一 WebSocket | 消息命令 | `RESUME` 必填 conversationId、afterMessageSeq；只返回当前主体仍可见的缺口消息 | `RealtimeGateway -> engagement.resumeMessages` 待实现 | `{"type":"RESUME","conversationId":"r-01","afterMessageSeq":40}` | `{"type":"RESUME","messages":[{"messageSeq":41},{"messageSeq":42}]}` |
