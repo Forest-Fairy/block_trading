@@ -16,6 +16,10 @@ param(
 
     [Parameter(Mandatory)]
     [ValidateNotNullOrEmpty()]
+    [string]$TimeoutSignalFile,
+
+    [Parameter(Mandatory)]
+    [ValidateNotNullOrEmpty()]
     [string]$WatcherLogFile
 )
 
@@ -66,7 +70,7 @@ while ($true) {
     }
 
     if ((Get-Date).ToUniversalTime() -ge $DeadlineUtc.ToUniversalTime()) {
-        # Check the completion-side stop signal again immediately before terminating the tree.
+        # Recheck normal completion immediately before publishing the timeout signal.
         if (Test-Path -LiteralPath $StopSignalFile -PathType Leaf) {
             Write-WatcherLog -Message 'Stop signal received at deadline; watcher is exiting.'
             exit 0
@@ -78,9 +82,28 @@ while ($true) {
             exit 0
         }
 
-        Write-WatcherLog -Message "Timeout reached; terminating supervisor PID $SupervisorProcessId and its child process tree."
-        & taskkill.exe /PID $SupervisorProcessId /T /F | Out-Null
-        exit $LASTEXITCODE
+        $temporaryPath = '{0}.{1}.tmp' -f $TimeoutSignalFile, ([Guid]::NewGuid().ToString('N'))
+        try {
+            $content = [ordered]@{
+                status = 'timed_out'
+                reachedAt = (Get-Date).ToUniversalTime().ToString('o')
+                supervisorProcessId = $SupervisorProcessId
+            } | ConvertTo-Json -Depth 3
+            [System.IO.File]::WriteAllText(
+                $temporaryPath,
+                $content,
+                (New-Object System.Text.UTF8Encoding($false))
+            )
+            [System.IO.File]::Move($temporaryPath, $TimeoutSignalFile)
+        }
+        finally {
+            if (Test-Path -LiteralPath $temporaryPath -PathType Leaf) {
+                Remove-Item -LiteralPath $temporaryPath -Force
+            }
+        }
+
+        Write-WatcherLog -Message 'Timeout reached; timeout signal written. The supervisor will stop scheduling without terminating the active Codex attempt.'
+        exit 0
     }
 
     Start-Sleep -Seconds 1

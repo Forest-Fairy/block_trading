@@ -2,13 +2,27 @@
 
 ## 用途
 
-`Invoke-CodexDevelopmentSupervisor.ps1` 用于在当前仓库启动 Codex 系统开发任务，并在 Codex 异常退出但尚未报告完成时持续恢复同一个 Codex 对话。
+`Invoke-CodexDevelopmentSupervisor.ps1` 用于在当前仓库启动 Codex 系统开发任务，并在 Codex 工作会话异常退出但尚未报告完成时，根据实际进度重组提示词并持续恢复同一个 Codex 工作会话。
 
-监督器首次调用 `codex exec --json`，从 `thread.started` 事件中保存会话 UUID。后续尝试固定调用 `codex exec resume <会话 UUID>`，不会使用可能与其他并发线程冲突的 `--last`。
+监督器首次调用 `codex exec --json`，从 `thread.started` 事件中保存工作会话 A 的 UUID。工作尝试未完成时，监督器会启动一个全新的只读、ephemeral 提示词调度会话，根据原始任务、上一轮最后消息、日志尾部、退出码、`git status --short` 和 `git diff --stat` 生成新的恢复提示词。随后固定调用 `codex exec resume <会话 UUID>` 恢复工作会话 A，不会使用可能与其他并发线程冲突的 `--last`。
+
+如果提示词调度会话失败或没有输出有效提示词，监督器会使用包含同一批进度证据的确定性回退提示词，避免恢复链路中断。如果首次工作尝试未能产生会话 UUID，下一轮会使用重组后的提示词创建新的工作会话。
 
 监督器只有收到与本次运行标识匹配的 `completion.json` 才会退出。Codex 工作线程必须完成代码、项目要求的文档回写和必要验证后，执行提示中给出的 `Complete-CodexDevelopmentTask.ps1` 命令。
 
-启动 Codex 前，监督器会异步启动独立超时监听进程。正常模式默认超时时长为 1 小时，配置值不能低于 1 小时。仅显式启用调试模式时，才可使用以秒为单位的超时，且最小值为 30 秒。到期时如果监督器仍在运行且尚未收到正常完成信号，监听进程会终止监督器及其当前 Codex 子进程树。Codex 单次异常退出不会停止监听进程，监督器仍会在总超时时间内恢复同一对话。
+启动工作会话前，监督器会异步启动独立超时监听进程。正常模式默认超时时长为 1 小时，配置值不能低于 1 小时。仅显式启用调试模式时，才可使用以秒为单位的超时，最小值为 1 秒。
+
+工作尝试和提示词调度尝试都运行在独立 attempt runner 中。到期时，监听进程只写入 `timeout.json`，监督器检测到信号后停止后续调度并以退出码 `2` 结束，不终止正在执行的 attempt runner 或其中的 Codex 会话。正在执行的 Codex 可以继续自然运行，但监督器退出后不会再为该次运行发起新的恢复尝试。Codex 单次异常退出不会停止监听进程；只要总超时尚未到达，监督器仍会重组提示词并恢复工作会话 A。
+
+## 调度流程
+
+1. 用户准备 UTF-8 任务文件，由主线程理解并确认最终目标。
+2. 监督器启动超时监听进程和独立工作 attempt runner，创建工作会话 A。
+3. 工作会话正常完成代码、文档和验证后写入匹配本次 Run ID 的 `completion.json`。
+4. 工作会话中断或未报告完成时，监督器汇总任务与真实进度。
+5. 监督器启动新的只读提示词调度 Codex 会话，生成下一轮恢复提示词。
+6. 监督器用新提示词恢复固定工作会话 A，并按退避间隔继续调度。
+7. 总超时到达后只停止监督器的后续调度，保留当前正在执行的 Codex attempt。
 
 ## 使用方式
 
@@ -46,13 +60,13 @@
     -TimeoutHours 1
 ```
 
-调试时可将总超时缩短为 30 秒或更长时间：
+调试时可使用以秒为单位的总超时。下面的 10 秒配置只用于验证调度器超时行为：
 
 ```powershell
 & '.\tools\Invoke-CodexDevelopmentSupervisor.ps1' `
     -TaskFile '.\development-task.md' `
     -DebugMode `
-    -DebugTimeoutSeconds 30
+    -DebugTimeoutSeconds 10
 ```
 
 ## 运行记录
@@ -63,8 +77,25 @@
 - `conversation-id.txt`：固定恢复的 Codex 会话 UUID。
 - `attempt-*.log`：每次执行或恢复的输出日志。
 - `attempt-*-last-message.md`：Codex 每次尝试的最后一条消息。
+- `attempt-*-result.json`：独立 attempt runner 的角色、退出码和执行时间。
+- `attempt-*-recovery-context.md`：传给新提示词调度会话的任务与进度证据。
+- `attempt-*-composer.log`：提示词调度会话的 JSONL 输出日志。
+- `attempt-*-composer-last-message.md`：提示词调度会话生成的恢复提示词原文。
+- `attempt-*-resume-prompt.md`：实际用于下一轮工作会话的动态恢复提示词。
+- `attempt-*-fallback-prompt.md`：提示词调度失败时使用的证据化回退提示词。
 - `completion.json`：工作线程执行完成命令后生成的完成记录。
 - `watcher.log`：超时监听进程的启动、停止或超时切断记录。
 - `watcher.stop`：正常完成或监督器退出时写入的监听停止信号。
+- `timeout.json`：监听进程到达总超时时写入的调度停止信号。
 
 若需要人工停止监督器，使用 `Ctrl+C`。人工停止后不会自动继续；再次启动脚本会创建新的监督运行。
+
+## 测试
+
+测试使用假 Codex，不会调用真实模型：
+
+```powershell
+& '.\tools\tests\Test-CodexDevelopmentSupervisor.ps1'
+```
+
+测试覆盖动态进度提示词重组、固定工作会话恢复、完成信号，以及 10 秒超时后监督器停止但活跃工作进程继续运行。

@@ -3,7 +3,6 @@ param(
     [Parameter(Mandatory)]
     [string]$LogFile,
 
-    [Parameter(Mandatory)]
     [string]$ConversationIdFile,
 
     [Parameter(ValueFromPipeline = $true)]
@@ -21,7 +20,8 @@ process {
     $writer.WriteLine($line)
     $writer.Flush()
 
-    if (-not (Test-Path -LiteralPath $ConversationIdFile -PathType Leaf) -and
+    if (-not [string]::IsNullOrWhiteSpace($ConversationIdFile) -and
+        -not (Test-Path -LiteralPath $ConversationIdFile -PathType Leaf) -and
         $line.Contains('thread.started')) {
         $threadId = [regex]::Match(
             $line,
