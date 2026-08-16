@@ -122,6 +122,166 @@ CREATE TABLE qh_student_verification (
     CONSTRAINT pk_qh_student_verification PRIMARY KEY (id)
 );
 
+CREATE TABLE qh_region (
+    id NUMBER(19) NOT NULL,
+    parent_region_id NUMBER(19),
+    region_type VARCHAR2(24 CHAR) NOT NULL,
+    region_code VARCHAR2(64 CHAR) NOT NULL,
+    region_name VARCHAR2(120 CHAR) NOT NULL,
+    province_name VARCHAR2(64 CHAR),
+    city_name VARCHAR2(64 CHAR),
+    district_name VARCHAR2(64 CHAR),
+    campus_id NUMBER(19),
+    status VARCHAR2(16 CHAR) NOT NULL,
+    enabled_at TIMESTAMP(6),
+    disabled_at TIMESTAMP(6),
+    version NUMBER(10) DEFAULT 0 NOT NULL,
+    created_by NUMBER(19),
+    updated_by NUMBER(19),
+    created_at TIMESTAMP(6) NOT NULL,
+    updated_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT uk_qh_region_code UNIQUE (region_code),
+    CONSTRAINT ck_qh_region_type CHECK (region_type IN ('CITY','DISTRICT','CAMPUS','SERVICE_AREA')),
+    CONSTRAINT ck_qh_region_campus CHECK (region_type = 'CAMPUS' OR campus_id IS NULL),
+    CONSTRAINT pk_qh_region PRIMARY KEY (id)
+);
+
+CREATE TABLE qh_region_business_policy (
+    id NUMBER(19) NOT NULL,
+    region_id NUMBER(19) NOT NULL,
+    business_type VARCHAR2(24 CHAR) NOT NULL,
+    enabled_flag CHAR(1) DEFAULT 'N' NOT NULL,
+    effective_from TIMESTAMP(6) NOT NULL,
+    effective_to TIMESTAMP(6),
+    policy_version VARCHAR2(64 CHAR) NOT NULL,
+    config_json CLOB,
+    status VARCHAR2(24 CHAR) NOT NULL,
+    approved_by_user_id NUMBER(19),
+    approved_at TIMESTAMP(6),
+    version NUMBER(10) DEFAULT 0 NOT NULL,
+    created_at TIMESTAMP(6) NOT NULL,
+    updated_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT uk_qh_region_policy_version UNIQUE (region_id, business_type, policy_version),
+    CONSTRAINT ck_qh_region_policy_flag CHECK (enabled_flag IN ('Y','N')),
+    CONSTRAINT ck_qh_region_policy_time CHECK (effective_to IS NULL OR effective_to > effective_from),
+    CONSTRAINT pk_qh_region_business_policy PRIMARY KEY (id)
+);
+
+CREATE TABLE qh_admin_role (
+    id NUMBER(19) NOT NULL,
+    role_code VARCHAR2(64 CHAR) NOT NULL,
+    role_name VARCHAR2(120 CHAR) NOT NULL,
+    role_type VARCHAR2(32 CHAR) NOT NULL,
+    builtin_flag CHAR(1) DEFAULT 'N' NOT NULL,
+    status VARCHAR2(16 CHAR) NOT NULL,
+    description VARCHAR2(500 CHAR),
+    created_at TIMESTAMP(6) NOT NULL,
+    updated_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT uk_qh_admin_role_code UNIQUE (role_code),
+    CONSTRAINT ck_qh_admin_role_type CHECK (role_type IN ('SYSTEM_ADMIN','OPERATION_ADMIN','REGION_ADMIN')),
+    CONSTRAINT ck_qh_admin_role_builtin CHECK (builtin_flag IN ('Y','N')),
+    CONSTRAINT pk_qh_admin_role PRIMARY KEY (id)
+);
+
+CREATE TABLE qh_admin_permission (
+    id NUMBER(19) NOT NULL,
+    permission_code VARCHAR2(96 CHAR) NOT NULL,
+    resource_type VARCHAR2(32 CHAR) NOT NULL,
+    action_type VARCHAR2(32 CHAR) NOT NULL,
+    risk_level VARCHAR2(16 CHAR) NOT NULL,
+    mfa_required CHAR(1) DEFAULT 'N' NOT NULL,
+    approval_required CHAR(1) DEFAULT 'N' NOT NULL,
+    status VARCHAR2(16 CHAR) NOT NULL,
+    description VARCHAR2(500 CHAR),
+    created_at TIMESTAMP(6) NOT NULL,
+    updated_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT uk_qh_admin_permission_code UNIQUE (permission_code),
+    CONSTRAINT ck_qh_admin_permission_flags CHECK (mfa_required IN ('Y','N') AND approval_required IN ('Y','N')),
+    CONSTRAINT pk_qh_admin_permission PRIMARY KEY (id)
+);
+
+CREATE TABLE qh_admin_role_permission (
+    id NUMBER(19) NOT NULL,
+    role_id NUMBER(19) NOT NULL,
+    permission_id NUMBER(19) NOT NULL,
+    granted_by_user_id NUMBER(19) NOT NULL,
+    granted_at TIMESTAMP(6) NOT NULL,
+    effective_from TIMESTAMP(6) NOT NULL,
+    expires_at TIMESTAMP(6),
+    status VARCHAR2(16 CHAR) NOT NULL,
+    created_at TIMESTAMP(6) NOT NULL,
+    updated_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT uk_qh_admin_role_permission UNIQUE (role_id, permission_id),
+    CONSTRAINT ck_qh_admin_role_perm_time CHECK (expires_at IS NULL OR expires_at > effective_from),
+    CONSTRAINT pk_qh_admin_role_permission PRIMARY KEY (id)
+);
+
+CREATE TABLE qh_admin_role_grant (
+    id NUMBER(19) NOT NULL,
+    user_id NUMBER(19) NOT NULL,
+    role_id NUMBER(19) NOT NULL,
+    data_scope VARCHAR2(16 CHAR) NOT NULL,
+    scope_key VARCHAR2(160 CHAR) NOT NULL,
+    region_id NUMBER(19),
+    campus_id NUMBER(19),
+    granted_by_user_id NUMBER(19) NOT NULL,
+    granted_at TIMESTAMP(6) NOT NULL,
+    effective_from TIMESTAMP(6) NOT NULL,
+    expires_at TIMESTAMP(6),
+    status VARCHAR2(16 CHAR) NOT NULL,
+    version NUMBER(10) DEFAULT 0 NOT NULL,
+    created_at TIMESTAMP(6) NOT NULL,
+    updated_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT uk_qh_admin_role_grant UNIQUE (user_id, role_id, scope_key),
+    CONSTRAINT ck_qh_admin_grant_time CHECK (expires_at IS NULL OR expires_at > effective_from),
+    CONSTRAINT ck_qh_admin_grant_scope CHECK (
+        (data_scope = 'ALL' AND region_id IS NULL AND campus_id IS NULL)
+        OR (data_scope = 'REGION' AND region_id IS NOT NULL AND campus_id IS NULL)
+        OR (data_scope = 'CAMPUS' AND campus_id IS NOT NULL)
+        OR (data_scope = 'SELF' AND region_id IS NULL AND campus_id IS NULL)
+    ),
+    CONSTRAINT pk_qh_admin_role_grant PRIMARY KEY (id)
+);
+
+CREATE TABLE qh_casbin_rule (
+    id NUMBER(19) NOT NULL,
+    ptype VARCHAR2(16 CHAR) NOT NULL,
+    v0 VARCHAR2(160 CHAR),
+    v1 VARCHAR2(160 CHAR),
+    v2 VARCHAR2(160 CHAR),
+    v3 VARCHAR2(160 CHAR),
+    v4 VARCHAR2(160 CHAR),
+    v5 VARCHAR2(160 CHAR),
+    rule_key VARCHAR2(512 CHAR) NOT NULL,
+    source_type VARCHAR2(32 CHAR) NOT NULL,
+    source_id NUMBER(19) NOT NULL,
+    policy_version NUMBER(19) NOT NULL,
+    status VARCHAR2(24 CHAR) NOT NULL,
+    synced_at TIMESTAMP(6),
+    created_at TIMESTAMP(6) NOT NULL,
+    updated_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT uk_qh_casbin_rule_key UNIQUE (rule_key),
+    CONSTRAINT pk_qh_casbin_rule PRIMARY KEY (id)
+);
+
+CREATE TABLE qh_admin_approval (
+    id NUMBER(19) NOT NULL,
+    approval_type VARCHAR2(32 CHAR) NOT NULL,
+    initiator_user_id NUMBER(19) NOT NULL,
+    approver_user_id NUMBER(19),
+    region_id NUMBER(19),
+    target_type VARCHAR2(32 CHAR) NOT NULL,
+    target_id NUMBER(19) NOT NULL,
+    status VARCHAR2(24 CHAR) NOT NULL,
+    reason VARCHAR2(1000 CHAR) NOT NULL,
+    expires_at TIMESTAMP(6),
+    decided_at TIMESTAMP(6),
+    created_at TIMESTAMP(6) NOT NULL,
+    updated_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT ck_qh_admin_approval_actor CHECK (approver_user_id IS NULL OR approver_user_id <> initiator_user_id),
+    CONSTRAINT pk_qh_admin_approval PRIMARY KEY (id)
+);
+
 CREATE TABLE qh_user_follow (
     id NUMBER(19) NOT NULL,
     follower_id NUMBER(19) NOT NULL,
@@ -1022,6 +1182,11 @@ CREATE TABLE qh_operation_audit_log (
     action_code VARCHAR2(64 CHAR) NOT NULL,
     operator_type VARCHAR2(24 CHAR) NOT NULL,
     operator_id NUMBER(19),
+    role_code_snapshot VARCHAR2(64 CHAR),
+    region_id NUMBER(19),
+    approval_id NUMBER(19),
+    purpose_code VARCHAR2(64 CHAR),
+    reason_code VARCHAR2(64 CHAR),
     target_type VARCHAR2(24 CHAR) NOT NULL,
     target_id NUMBER(19) NOT NULL,
     result_code VARCHAR2(24 CHAR) NOT NULL,
@@ -1035,6 +1200,15 @@ CREATE TABLE qh_operation_audit_log (
 );
 
 CREATE INDEX ix_qh_post_feed ON qh_post (status, post_type, primary_occurs_at, published_at);
+CREATE INDEX ix_qh_region_parent_status ON qh_region (parent_region_id, status, region_type);
+CREATE INDEX ix_qh_region_policy_active ON qh_region_business_policy (region_id, business_type, status, effective_from, effective_to);
+CREATE INDEX ix_qh_admin_role_permission ON qh_admin_role_permission (role_id, status, expires_at);
+CREATE INDEX ix_qh_admin_permission_role ON qh_admin_role_permission (permission_id, status);
+CREATE INDEX ix_qh_admin_grant_user ON qh_admin_role_grant (user_id, status, effective_from, expires_at);
+CREATE INDEX ix_qh_admin_grant_scope ON qh_admin_role_grant (data_scope, region_id, campus_id, role_id, status);
+CREATE INDEX ix_qh_casbin_rule_subject ON qh_casbin_rule (ptype, v0, v1, status);
+CREATE INDEX ix_qh_casbin_rule_source ON qh_casbin_rule (source_type, source_id, policy_version);
+CREATE INDEX ix_qh_admin_approval_target ON qh_admin_approval (target_type, target_id, status, expires_at);
 CREATE INDEX ix_qh_post_scope ON qh_post (visibility_scope, campus_id, published_at);
 CREATE INDEX ix_qh_post_participant_user ON qh_post_participant (user_id, join_status, updated_at);
 CREATE INDEX ix_qh_post_participant_settlement ON qh_post_participant (group_buy_settlement_id, payment_projection_event_id);

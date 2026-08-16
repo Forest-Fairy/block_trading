@@ -206,7 +206,7 @@ export function RecommendPage({
 
   const startDockHold = (event: React.PointerEvent<HTMLButtonElement>) => {
     if (!assistantDocked || dockHoldTimerRef.current) return
-    const now = Date.now()
+    const now = event.timeStamp
     if (now - dockLastPointerDownRef.current <= 320) {
       if (dockClickTimerRef.current) {
         window.clearTimeout(dockClickTimerRef.current)
@@ -217,7 +217,10 @@ export function RecommendPage({
       skipNextDockClickRef.current = true
       releasedAssistantRef.current = true
       playAssistantSound("double", assistantFeedback.soundEnabled)
-      window.setTimeout(() => playAssistantSound("pop", assistantFeedback.soundEnabled), 110)
+      window.setTimeout(
+        () => playAssistantSound("pop", assistantFeedback.soundEnabled),
+        110
+      )
       vibrateAssistant(90, assistantFeedback.vibrationEnabled)
       dockPointerRef.current = {
         x: event.clientX,
@@ -225,7 +228,7 @@ export function RecommendPage({
         pointerId: event.pointerId,
       }
       event.currentTarget.setPointerCapture(event.pointerId)
-      onReleaseAssistant(dockPointerRef.current)
+      releaseAssistant()
       dockLastPointerDownRef.current = 0
       return
     }
@@ -246,10 +249,19 @@ export function RecommendPage({
       releasedAssistantRef.current = true
       skipNextDockClickRef.current = true
       stopDockVibration()
-      window.setTimeout(() => playAssistantSound("pop", assistantFeedback.soundEnabled), 110)
+      window.setTimeout(
+        () => playAssistantSound("pop", assistantFeedback.soundEnabled),
+        110
+      )
       vibrateAssistant(90, assistantFeedback.vibrationEnabled)
-      onReleaseAssistant(dockPointerRef.current)
+      releaseAssistant()
     }, 2000)
+  }
+
+  const releaseAssistant = () => {
+    onReleaseAssistant({
+      ...dockPointerRef.current,
+    })
   }
 
   const moveReleasedAssistant = (
@@ -626,7 +638,7 @@ export function RecommendPage({
           <p className="text-xs font-semibold text-primary">
             星期四 · 8 月 7 日
           </p>
-          <div className="mt-1 flex items-center gap-2">
+          <div className="recommend-title-row mt-1 flex items-center gap-2">
             <h1 className="text-[1.6875rem] font-extrabold tracking-[-0.02em]">
               趣汇
             </h1>
@@ -636,7 +648,10 @@ export function RecommendPage({
                   className="assistant-embedded-menu"
                   draftActions={assistantDraftActions}
                   onSelect={(action) => {
-                    playAssistantSound("menu-close", assistantFeedback.soundEnabled)
+                    playAssistantSound(
+                      "menu-close",
+                      assistantFeedback.soundEnabled
+                    )
                     onSelectAssistant(action)
                   }}
                 />
@@ -702,75 +717,99 @@ export function RecommendPage({
         </div>
       </div>
 
-      <Card className="mb-4 gap-0 border-0 bg-white/80 py-0 shadow-none">
-        <CardContent className="p-1.5">
-          <div className="mb-0.5 flex h-5 items-center justify-between px-1">
-            <p className="text-xs font-bold text-foreground">订单状态</p>
+      {viewerMode === "guest" ? (
+        <Card className="mb-4 gap-0 border-primary/15 bg-secondary/55 py-0 shadow-none">
+          <CardContent className="flex items-center gap-3 p-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <PackageCheck size={16} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold">交易状态预览</p>
+              <p className="mt-1 text-[0.6875rem] text-muted-foreground">
+                认证入会后可查看自己的订单、配送和售后通知
+              </p>
+            </div>
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="h-5 gap-0.5 px-1 text-[0.5625rem] font-medium text-primary"
               onClick={onOpenMessages}
             >
-              查看全部 <ChevronRight size={11} />
+              了解流程 <ChevronRight size={12} />
             </Button>
-          </div>
-          <div
-            ref={orderViewportRef}
-            className="hide-scrollbar aspect-[4/1] snap-y snap-mandatory overflow-y-auto overscroll-contain"
-            aria-label="订单状态，可上下滚动，每次显示三条"
-            aria-live="off"
-            tabIndex={0}
-            onWheel={pauseOrderAutoScroll}
-            onTouchStart={pauseOrderAutoScroll}
-            onPointerDown={pauseOrderAutoScroll}
-            onKeyDown={pauseOrderAutoScroll}
-          >
-            {[0, 1, 0].map((groupIndex, copyIndex) => (
-              <div
-                key={`${groupIndex}-${copyIndex}`}
-                className="aspect-[4/1] snap-start space-y-1"
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="mb-4 gap-0 border-0 bg-white/80 py-0 shadow-none">
+          <CardContent className="p-1.5">
+            <div className="mb-0.5 flex h-5 items-center justify-between px-1">
+              <p className="text-xs font-bold text-foreground">订单状态</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-5 gap-0.5 px-1 text-[0.5625rem] font-medium text-primary"
+                onClick={onOpenMessages}
               >
-                {[0, 1, 2].map((offset) => {
-                  const item = orderUpdates[groupIndex * 3 + offset]
-                  const tone = {
-                    blue: "bg-[var(--qh-blue-soft)] text-[var(--qh-blue)]",
-                    green: "bg-secondary text-primary",
-                    yellow: "bg-[var(--qh-yellow-soft)] text-[#77551c]",
-                  }[item.tone]
-                  const Icon =
-                    item.id === "shipping"
-                      ? Truck
-                      : item.id === "reminder"
-                        ? Clock3
-                        : PackageCheck
-                  return (
-                    <button
-                      key={`${item.id}-${copyIndex}`}
-                      type="button"
-                      className="flex h-7 w-full items-center gap-2 rounded-lg bg-muted/40 px-2 py-0.5 text-left transition-colors hover:bg-muted"
-                      onClick={onOpenMessages}
-                    >
-                      <span
-                        className={`flex size-5 shrink-0 items-center justify-center rounded-md ${tone}`}
+                查看全部 <ChevronRight size={11} />
+              </Button>
+            </div>
+            <div
+              ref={orderViewportRef}
+              className="hide-scrollbar aspect-[4/1] snap-y snap-mandatory overflow-y-auto overscroll-contain"
+              aria-label="订单状态，可上下滚动，每次显示三条"
+              aria-live="off"
+              tabIndex={0}
+              onWheel={pauseOrderAutoScroll}
+              onTouchStart={pauseOrderAutoScroll}
+              onPointerDown={pauseOrderAutoScroll}
+              onKeyDown={pauseOrderAutoScroll}
+            >
+              {[0, 1, 0].map((groupIndex, copyIndex) => (
+                <div
+                  key={`${groupIndex}-${copyIndex}`}
+                  className="aspect-[4/1] snap-start space-y-1"
+                >
+                  {[0, 1, 2].map((offset) => {
+                    const item = orderUpdates[groupIndex * 3 + offset]
+                    const tone = {
+                      blue: "bg-[var(--qh-blue-soft)] text-[var(--qh-blue)]",
+                      green: "bg-secondary text-primary",
+                      yellow: "bg-[var(--qh-yellow-soft)] text-[#77551c]",
+                    }[item.tone]
+                    const Icon =
+                      item.id === "shipping"
+                        ? Truck
+                        : item.id === "reminder"
+                          ? Clock3
+                          : PackageCheck
+                    return (
+                      <button
+                        key={`${item.id}-${copyIndex}`}
+                        type="button"
+                        className="flex h-7 w-full items-center gap-2 rounded-lg bg-muted/40 px-2 py-0.5 text-left transition-colors hover:bg-muted"
+                        onClick={onOpenMessages}
                       >
-                        <Icon size={12} />
-                      </span>
-                      <span className="min-w-0 flex-1 truncate text-[0.625rem] font-semibold">
-                        {item.title}
-                      </span>
-                      <span className="shrink-0 text-[0.5625rem] text-muted-foreground">
-                        {item.meta}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+                        <span
+                          className={`flex size-5 shrink-0 items-center justify-center rounded-md ${tone}`}
+                        >
+                          <Icon size={12} />
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-[0.625rem] font-semibold">
+                          {item.title}
+                        </span>
+                        <span className="shrink-0 text-[0.5625rem] text-muted-foreground">
+                          {item.meta}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {!hiddenIds.includes("hero") && viewerMode !== "guest" ? (
         heroCollapsed ? (
@@ -783,25 +822,19 @@ export function RecommendPage({
           </button>
         ) : (
           <Card className="mb-4 aspect-[25/12] gap-0 rounded-none border-0 bg-transparent py-0 shadow-none">
-            <div
-              className="relative flex h-full min-h-0"
-              role="button"
-              tabIndex={0}
-              onClick={() => onOpenPostDetail("travel")}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault()
-                  onOpenPostDetail("travel")
-                }
-              }}
-            >
-              <div className="h-full w-[38.2%] shrink-0 overflow-hidden bg-muted">
+            <div className="relative flex h-full min-h-0">
+              <button
+                type="button"
+                className="h-full w-[38.2%] shrink-0 overflow-hidden bg-muted"
+                aria-label="查看周日径山轻徒步详情"
+                onClick={() => onOpenPostDetail("travel")}
+              >
                 <img
                   className="image-cover"
                   src={imageUrls.hike}
                   alt="径山徒步活动"
                 />
-              </div>
+              </button>
               <div className="flex min-w-0 flex-1 flex-col rounded-r-xl border-y border-r border-border/70 bg-white py-3.5 pr-4 pl-3.5">
                 <div className="flex items-center gap-2.5 text-xs">
                   <p className="font-extrabold text-primary">今日首推</p>
@@ -810,7 +843,13 @@ export function RecommendPage({
                   </span>
                 </div>
                 <h2 className="mt-1.5 line-clamp-2 text-[1.0625rem] leading-tight font-extrabold">
-                  周日径山轻徒步
+                  <button
+                    type="button"
+                    className="text-left hover:text-primary"
+                    onClick={() => onOpenPostDetail("travel")}
+                  >
+                    周日径山轻徒步
+                  </button>
                 </h2>
                 <p className="mt-1.5 text-xs font-semibold text-primary">
                   还差 2 位同行者
@@ -921,19 +960,8 @@ export function RecommendPage({
               }[item.activity.tone]
               return (
                 <Card key={item.id} className="overflow-hidden">
-                  <div
-                    className="flex gap-3 p-3"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => onOpenPostDetail(item.activity.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault()
-                        onOpenPostDetail(item.activity.id)
-                      }
-                    }}
-                  >
-                    <div className="w-[28%] shrink-0 aspect-[22/23] overflow-hidden rounded-lg bg-muted">
+                  <div className="flex gap-3 p-3">
+                    <div className="aspect-[22/23] w-[28%] shrink-0 overflow-hidden rounded-lg bg-muted">
                       <img
                         className="image-cover"
                         src={item.activity.image}
@@ -967,7 +995,13 @@ export function RecommendPage({
                         </div>
                       </div>
                       <h3 className="truncate text-sm font-bold">
-                        {item.activity.title}
+                        <button
+                          type="button"
+                          className="w-full truncate text-left hover:text-primary"
+                          onClick={() => onOpenPostDetail(item.activity.id)}
+                        >
+                          {item.activity.title}
+                        </button>
                       </h3>
                       <p className="mt-1 truncate text-xs text-muted-foreground">
                         {item.activity.detail}
@@ -1029,19 +1063,8 @@ export function RecommendPage({
             if (item.kind === "product") {
               return (
                 <Card key={item.id} className="overflow-hidden">
-                  <div
-                    className="flex gap-3 p-3"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => onOpenProductDetail(item.product.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault()
-                        onOpenProductDetail(item.product.id)
-                      }
-                    }}
-                  >
-                    <div className="relative w-[29%] shrink-0 aspect-square overflow-hidden rounded-lg bg-muted">
+                  <div className="flex gap-3 p-3">
+                    <div className="relative aspect-square w-[29%] shrink-0 overflow-hidden rounded-lg bg-muted">
                       <img
                         className="image-cover"
                         src={item.product.image}

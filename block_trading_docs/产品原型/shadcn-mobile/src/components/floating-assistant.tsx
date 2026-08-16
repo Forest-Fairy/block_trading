@@ -78,6 +78,7 @@ export function FloatingAssistant({
   releasePointer,
   followPointer,
   followEnd,
+  onInteractionComplete,
   feedbackSettings,
 }: {
   docked: boolean
@@ -92,6 +93,7 @@ export function FloatingAssistant({
   } | null
   followPointer: { x: number; y: number; pointerId: number } | null
   followEnd: { x: number; y: number; pointerId: number; endedAt: number } | null
+  onInteractionComplete: () => void
   feedbackSettings: AssistantFeedbackSettings
 }) {
   const [side, setSide] = useState<"left" | "right">("right")
@@ -106,6 +108,7 @@ export function FloatingAssistant({
     "approach" | "center" | "embed" | null
   >(null)
   const [dockScale, setDockScale] = useState(0.56)
+  const [dockAnimationKey, setDockAnimationKey] = useState(0)
   const [popping, setPopping] = useState(false)
   const [menuBottomBoundary, setMenuBottomBoundary] = useState(650)
   const pointerStart = useRef<{
@@ -120,11 +123,13 @@ export function FloatingAssistant({
   const dockTimer = useRef<number | null>(null)
   const dockStageTimer = useRef<number | null>(null)
   const dockIdleTimer = useRef<number | null>(null)
+  const popTimer = useRef<number | null>(null)
   const dockCandidate = useRef<DragPosition | null>(null)
   const dockPositionRef = useRef<DragPosition | null>(null)
   const suppressDockUntilExit = useRef(false)
   const assistantRef = useRef<HTMLDivElement>(null)
   const skipCollapsedClick = useRef(false)
+  const releaseHasMoved = useRef(false)
   const hasDraft = draftActions.length > 0
 
   const scheduleCollapse = useCallback(() => {
@@ -160,6 +165,7 @@ export function FloatingAssistant({
       if (dockTimer.current) window.clearTimeout(dockTimer.current)
       if (dockStageTimer.current) window.clearTimeout(dockStageTimer.current)
       if (dockIdleTimer.current) window.clearTimeout(dockIdleTimer.current)
+      if (popTimer.current) window.clearTimeout(popTimer.current)
       stopAssistantSound("dock-charge")
     }
   }, [scheduleCollapse])
@@ -196,9 +202,9 @@ export function FloatingAssistant({
       const navTop = navBounds
         ? navBounds.top - shellBounds.top
         : shellBounds.height
-      const currentBallSize = button.getBoundingClientRect().width || ballSize
+      const currentBallSize = button.offsetWidth || ballSize
       const currentBallRadius = currentBallSize / 2
-      const maxTop = Math.max(52, navTop - currentBallSize)
+      const maxTop = Math.max(0, navTop - currentBallSize)
       return {
         left: Math.max(
           0,
@@ -208,7 +214,7 @@ export function FloatingAssistant({
           )
         ),
         top: Math.max(
-          52,
+          0,
           Math.min(clientY - shellBounds.top - currentBallRadius, maxTop)
         ),
       }
@@ -254,7 +260,7 @@ export function FloatingAssistant({
       const shellBounds = shell.getBoundingClientRect()
       const currentBallSize =
         assistantRef.current?.querySelector<HTMLButtonElement>(".assistant-ball")
-          ?.getBoundingClientRect().width ?? ballSize
+          ?.offsetWidth ?? ballSize
       const currentBallRadius = currentBallSize / 2
       const centerX = shellBounds.left + position.left + currentBallRadius
       const centerY = shellBounds.top + position.top + currentBallRadius
@@ -291,7 +297,7 @@ export function FloatingAssistant({
         const shellRect = currentShell.getBoundingClientRect()
         const floatingBallSize =
           currentShell.querySelector<HTMLButtonElement>(".assistant-ball")
-            ?.getBoundingClientRect().width ?? ballSize
+            ?.offsetWidth ?? ballSize
         const floatingBallRadius = floatingBallSize / 2
         const targetSize = targetRect.width
         const alignedPosition = {
@@ -306,7 +312,7 @@ export function FloatingAssistant({
             )
           ),
           top: Math.max(
-            52,
+            0,
             targetRect.top - shellRect.top + targetRect.height / 2 - floatingBallRadius
           ),
         }
@@ -318,6 +324,8 @@ export function FloatingAssistant({
         dockIdleTimer.current = null
         setDragging(false)
         draggingRef.current = false
+        setPopping(false)
+        setDockAnimationKey((key) => key + 1)
         setDocking(true)
         setDockStage("approach")
         setDockPosition(halfwayPosition)
@@ -377,22 +385,27 @@ export function FloatingAssistant({
         )
       }
       draggingRef.current = false
+      releaseHasMoved.current = false
       setDragging(false)
       setDragPosition(null)
+      onInteractionComplete()
     },
-    [dragPosition]
+    [dragPosition, onInteractionComplete]
   )
 
   useEffect(() => {
     if (!releasePointer || docked) return
-    let popTimer: number | null = null
     const releaseFrame = window.requestAnimationFrame(() => {
       const ball = document.querySelector<HTMLButtonElement>(".assistant-ball")
-      if (!ball) return
+      const dockTarget = document.querySelector<HTMLElement>(
+        "[data-assistant-dock]"
+      )
+      if (!ball || !dockTarget) return
+      const targetBounds = dockTarget.getBoundingClientRect()
       const releasePosition = getDragPosition(
         ball,
-        releasePointer.x,
-        releasePointer.y
+        targetBounds.left + targetBounds.width / 2,
+        targetBounds.top + targetBounds.height / 2
       )
       if (!releasePosition) return
       if (idleTimer.current) window.clearTimeout(idleTimer.current)
@@ -402,6 +415,7 @@ export function FloatingAssistant({
         y: releasePointer.y,
         pointerId: releasePointer.pointerId,
       }
+      releaseHasMoved.current = false
       draggingRef.current = true
       suppressDockUntilExit.current = true
       setDockPosition(null)
@@ -409,11 +423,14 @@ export function FloatingAssistant({
       setDragging(true)
       setDragPosition(releasePosition)
       setPopping(true)
-      popTimer = window.setTimeout(() => setPopping(false), 560)
+      if (popTimer.current) window.clearTimeout(popTimer.current)
+      popTimer.current = window.setTimeout(() => {
+        popTimer.current = null
+        setPopping(false)
+      }, 560)
     })
     return () => {
       window.cancelAnimationFrame(releaseFrame)
-      if (popTimer) window.clearTimeout(popTimer)
     }
   }, [docked, getDragPosition, releasePointer])
 
@@ -421,6 +438,11 @@ export function FloatingAssistant({
     (clientX: number, clientY: number, pointerId: number) => {
       const start = pointerStart.current
       if (!start || start.pointerId !== pointerId) return
+      if (
+        Math.abs(clientX - start.x) + Math.abs(clientY - start.y) > 2
+      ) {
+        releaseHasMoved.current = true
+      }
       if (idleTimer.current) window.clearTimeout(idleTimer.current)
       idleTimer.current = null
       const nextPosition = getDragPosition(start.button, clientX, clientY)
@@ -458,7 +480,12 @@ export function FloatingAssistant({
       if (!start || start.pointerId !== pointerId) return
       pointerStart.current = null
       if (!draggingRef.current) return
-      const nextPosition = getDragPosition(start.button, clientX, clientY)
+      const releasedFromDock =
+        suppressDockUntilExit.current && !releaseHasMoved.current
+      const nextPosition =
+        !releaseHasMoved.current && dragPosition
+          ? dragPosition
+          : getDragPosition(start.button, clientX, clientY)
       const shell = start.button.closest(".phone-shell")
       let dockCandidate = false
       if (nextPosition && shell) {
@@ -466,23 +493,27 @@ export function FloatingAssistant({
         dockCandidate = updateDockCandidate(nextPosition)
         if (!dockCandidate) {
           setSide(
-            nextPosition.left + ballRadius <
-              shell.getBoundingClientRect().width / 2
-              ? "left"
-              : "right"
+            releasedFromDock
+              ? "right"
+              : nextPosition.left + ballRadius <
+                  shell.getBoundingClientRect().width / 2
+                ? "left"
+                : "right"
           )
         }
       }
       setDragPosition(null)
       setDragging(false)
       draggingRef.current = false
+      releaseHasMoved.current = false
       ignoreClick.current = true
       window.setTimeout(() => {
         ignoreClick.current = false
       }, 0)
       if (!dockCandidate) scheduleCollapse()
+      onInteractionComplete()
     },
-    [getDragPosition, scheduleCollapse, updateDockCandidate]
+    [dragPosition, getDragPosition, onInteractionComplete, scheduleCollapse, updateDockCandidate]
   )
 
   useEffect(() => {
@@ -499,6 +530,14 @@ export function FloatingAssistant({
         y: followPointer.y,
         pointerId: followPointer.pointerId,
       }
+    }
+    const start = pointerStart.current
+    if (
+      start &&
+      Math.abs(followPointer.x - start.x) + Math.abs(followPointer.y - start.y) >
+        2
+    ) {
+      releaseHasMoved.current = true
     }
     draggingRef.current = true
     setDragging(true)
@@ -633,6 +672,7 @@ export function FloatingAssistant({
         />
       ) : null}
       <button
+        key={`assistant-ball-${dockAnimationKey}`}
         type="button"
         className="assistant-ball"
         aria-label={menuOpen ? "关闭悬浮助手菜单" : "打开悬浮助手菜单"}

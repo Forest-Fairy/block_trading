@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader, IconButton } from "@/components/prototype-shell"
+import type { ViewerMode } from "@/prototype/data"
 
 type MessageView = "inbox" | "chat"
 
@@ -315,19 +316,69 @@ export function MessagesPage({
   onRead,
   onOpenPostDetail,
   onChatOpenChange,
+  viewerMode,
 }: {
   onRead: () => void
   onOpenPostDetail: (activityId: string) => void
   onChatOpenChange: (open: boolean) => void
+  viewerMode: ViewerMode
 }) {
   const [active, setActive] = useState("全部")
   const [view, setView] = useState<MessageView>("inbox")
   const [conversationId, setConversationId] = useState("lin")
+  const [guestToast, setGuestToast] = useState("")
 
   useEffect(() => {
     onChatOpenChange(view === "chat")
     return () => onChatOpenChange(false)
   }, [onChatOpenChange, view])
+
+  if (viewerMode === "guest") {
+    return (
+      <div className="page-content">
+        <PageHeader eyebrow="公开系统通知" title="消息" />
+        <Card className="border-primary/20 bg-secondary/40 py-0">
+          <CardContent className="p-3.5">
+            <div className="flex items-start gap-3">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <Bell size={18} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-sm font-bold">完成身份信息认证后入会</h1>
+                  <Badge variant="outline" className="border-0 bg-[var(--qh-coral)] text-[0.625rem] text-white">
+                    未读
+                  </Badge>
+                </div>
+                <p className="mt-1 text-[0.6875rem] text-muted-foreground">
+                  刚刚 · 系统通知
+                </p>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                  登录后完成身份信息认证，即可从 VIP_1 开始入会并使用完整服务。
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => {
+                    setGuestToast("请先登录并完成身份信息认证")
+                    window.setTimeout(() => setGuestToast(""), 2200)
+                  }}
+                >
+                  去完成认证 <ChevronRight size={14} />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        {guestToast ? (
+          <div className="recommend-toast" role="status" aria-live="polite">
+            {guestToast}
+          </div>
+        ) : null}
+      </div>
+    )
+  }
 
   if (view === "chat")
     return (

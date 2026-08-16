@@ -19,6 +19,7 @@
 | R1_ID_001 | identity | 未完成学生认证时不能开启校园模式；认证撤销后现有校园范围立即失效 | D/A/S | `block_trading_d_identity_test`、`block_trading_a_identity_test`、`block_trading_system_test` |
 | R1_ID_002 | identity/visibility | 任一方向存在有效拉黑时，双方不能读取资料、内容、互动或消息 | D/A/S | `block_trading_d_visibility_test`、`block_trading_a_visibility_test`、`block_trading_system_test` |
 | R1_REGION_001 | region_policy | 区域管理员只能操作授权区域；区域关闭不关闭已完成订单的售后入口 | D/A/U/S | `block_trading_d_region_policy_test`、`block_trading_a_region_policy_test`、`block_trading_ui_admin_gateway_test`、`block_trading_system_test` |
+| R1_RBAC_001 | identity/region_policy/governance | 游客不得写入或进入管理能力；同一 `qh_user` 的角色授权决定客户端区域入口或后台管理入口，且区域管理员只能读取和操作获授权范围 | D/A/U/S | `block_trading_d_identity_test`、`block_trading_d_region_policy_test`、`block_trading_a_governance_test`、`block_trading_ui_client_gateway_test`、`block_trading_ui_admin_gateway_test`、`block_trading_system_test` |
 | R1_COMMUNITY_001 | community | 参与人数不超过上限；退出/取消符合帖子状态机；状态流水可追溯 | D/A | `block_trading_d_community_test`、`block_trading_a_community_test` |
 | R1_MOD_001 | moderation/community | 新帖默认待审不可见；高危临时措施得到社区控制回执，否则安全降级不可见/不可互动 | D/A/S | `block_trading_d_moderation_test`、`block_trading_a_process_content_publication_test`、`block_trading_system_test` |
 | R1_MOD_002 | moderation | 规则 -> 模型 -> 人工阶段可追溯；模型结果不可独立形成最终处罚 | D/A/I | `block_trading_d_moderation_test`、`block_trading_a_moderation_test`、`block_trading_i_plugin_embabel_test` |
@@ -62,6 +63,13 @@
 | R1_MESSAGE_002 | engagement/user_interface | 私聊、群聊和客服会话发送失败时保留原消息、失败原因和重试入口；活动会话不返回手机号或精确地址，系统状态消息不能伪造成普通用户消息 | D/A/U/S | `block_trading_d_engagement_test`、`block_trading_a_engagement_test`、`block_trading_ui_client_gateway_test`、`block_trading_system_test` |
 | R1_PROFILE_002 | identity/growth_benefits | 资料保存校验昵称、用户名和签名边界；兑换码去除首尾空格并按大小写规则校验，已使用、过期、不适用和网络失败均返回可解释状态且不泄露其他账户信息 | D/A/U/S | `block_trading_d_growth_benefits_test`、`block_trading_a_growth_benefits_test`、`block_trading_ui_client_gateway_test`、`block_trading_system_test` |
 | R1_ASSIST_002 | user_interface/community | 悬浮助手拖动仅吸附左右边缘且不遮挡导航；收起、展开、菜单外关闭和未完成草稿标记不丢失，进入建帖或客服后按页面层级安全返回 | U/S | `block_trading_ui_client_gateway_test`、`block_trading_system_test` |
+| R1_GUEST_001 | identity/user_interface/commerce/engagement | 游客可预览公开推荐、社区、商城、交易流程和单条入会通知；不得读取真实订单或会话，收藏、加购、下单、支付、发送消息和助手建帖均返回登录要求且不产生持久化事实 | A/U/S | `block_trading_a_identity_test`、`block_trading_a_commerce_test`、`block_trading_a_engagement_test`、`block_trading_ui_client_gateway_test`、`block_trading_system_test` |
+| R1_CAMPUS_001 | identity/visibility/discovery | 校园模式只允许本人发布和服务端确认的有效关注用户跨校区展示；普通跨校内容、已取消关注、伪造客户端关注标记和过期缓存均被过滤 | D/A/I/U/S | `block_trading_d_visibility_test`、`block_trading_a_visibility_test`、`block_trading_a_discovery_test`、`block_trading_i_plugin_opensearch_test`、`block_trading_ui_client_gateway_test` |
+| R1_RBAC_SYNC_001 | region_policy/governance | `qh_admin_role_grant` 变更生成对应 Casbin 投影版本；投影同步失败、版本落后、授权到期或撤销时移动端和 PC 后台均失败关闭并记录审计 | D/A/I/U/S | `block_trading_d_region_policy_test`、`block_trading_a_region_policy_test`、`block_trading_i_repository_oracle_test`、`block_trading_ui_admin_gateway_test`、`block_trading_system_test` |
+| R1_ADMIN_SURFACE_001 | user_interface/region_policy | 三类管理员均可从客户端设置进入授权范围内的移动管理界面，并从独立 PC Web 入口进入同角色工作台；普通 VIP、游客和超范围请求在两端均被拒绝 | A/U/S | `block_trading_a_region_policy_test`、`block_trading_ui_client_gateway_test`、`block_trading_ui_admin_gateway_test`、`block_trading_system_test` |
+| R1_MALL_001 | commerce/user_interface | 登录用户可完成商品规格预览、加购、购物车、订单确认、价格快照和订单状态查询；重复确认不重复创建订单，游客同路径只显示预览和登录提示 | D/A/U/S | `block_trading_d_commerce_test`、`block_trading_a_commerce_test`、`block_trading_ui_client_gateway_test`、`block_trading_system_test` |
+| R1_PAYMENT_001 | commerce/provider_callback | 白名单订单支付回调先验签并按渠道事件幂等保存；金额或订单不匹配不得改变状态，失败订单可安全重试，退款只能经人工工单收口 | D/A/I/U/S | `block_trading_d_commerce_test`、`block_trading_a_commerce_test`、`block_trading_i_plugin_payment_test`、`block_trading_ui_provider_callback_test`、`block_trading_system_test` |
+| R1_UI_003 | user_interface | 商品卡片、管理入口、悬浮助手和交易控件不存在嵌套交互元素；关键桌面/移动路径控制台无 error，键盘与点击不会触发相邻操作 | U/S | `block_trading_ui_client_gateway_test`、`block_trading_ui_admin_gateway_test`、`block_trading_system_test` |
 
 ## 4. R2 单区域交易履约用例
 

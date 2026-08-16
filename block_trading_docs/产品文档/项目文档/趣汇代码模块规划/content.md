@@ -242,7 +242,7 @@ class OracleConversationRepository(
 
 组合实现的约束是“一个 Repository Port、一个应用事务、每个写动作一个明确 DAO 责任”，不是“一个实现只能使用一个 ORM”。两个 DAO 必须共享同一个 Oracle DataSource 和 Spring TransactionManager；同一次业务操作不得分别通过两个 DAO 重复更新同一状态或重复写 Outbox；MyBatis-Flex 写入影响 Jimmer 缓存时必须在提交后失效；乐观锁影响行数为零必须映射为领域并发冲突；Jimmer Entity、Mapper 和 DAO 类型不得越过 Infrastructure。
 
-测试父模块按发布周期增量聚合：当前周期只纳入已实施领域、既往回归模块和本期 System 场景。后续周期模块可预留 artifactId、版本化 API 契约和默认关闭的 Stub，但不得创建为当前 Reactor/CI 的必需模块，更不得要求当前周期连接尚未启用的供应商或运行时。
+测试父模块按发布周期增量聚合：当前周期只纳入已实施领域、既往回归模块和本期 System 场景。后续周期模块可预留 artifactId、版本化 API 契约和默认关闭的 Stub，但不得创建为当前 Gradle Build/CI 的必需模块，更不得要求当前周期连接尚未启用的供应商或运行时。
 
 ## 4. 前端工程边界
 
@@ -349,7 +349,7 @@ block_trading_deployment/
 
 ### 6.3 构建门禁
 
-1. 已实施领域的测试和架构测试必须在每次提交执行；任何失败阻断合并。未启用的后续领域测试不进入当前周期 Reactor、层测试父模块或 CI。
+1. 已实施领域的测试和架构测试必须在每次提交执行；任何失败阻断合并。未启用的后续领域测试不进入当前周期 Gradle Build、层测试父模块或 CI。
 2. 修改单一领域时，至少执行该领域的 Domain、Application、UI/Infrastructure（适用时）和关联 Process 测试。
 3. 修改共享 API、事件 Schema、可见性、审核、支付、库存、封禁或数据治理时，必须执行对应 `block_trading_system_test` 场景。
 4. R1 使用 Stub 与 Testcontainers 组合；支付、物流、模型供应商禁止依赖生产凭据完成自动化测试。

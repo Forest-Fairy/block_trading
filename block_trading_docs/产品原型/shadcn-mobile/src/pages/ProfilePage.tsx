@@ -53,6 +53,7 @@ import {
 import { IconButton } from "@/components/prototype-shell"
 import { ProfileContentPanel } from "@/components/profile-content-panel"
 import { formatCurrentLocation } from "@/lib/location-display"
+import type { ManagementSettingsEntry } from "@/prototype/access"
 
 type MiniProgramGroup = {
   group: string
@@ -113,6 +114,8 @@ export function ProfilePage({
   onCheckIn,
   onOpenMembership,
   onOpenPreferenceDetail,
+  managementEntry,
+  onOpenManagement,
 }: {
   campusMode: boolean
   onCampusModeChange: (enabled: boolean) => void
@@ -124,6 +127,8 @@ export function ProfilePage({
   onCheckIn: () => boolean
   onOpenMembership: () => void
   onOpenPreferenceDetail: (preference: PreferenceKey) => void
+  managementEntry: ManagementSettingsEntry | null
+  onOpenManagement: () => void
 }) {
   const [redeemOpen, setRedeemOpen] = useState(false)
   const [studentVerifyOpen, setStudentVerifyOpen] = useState(false)
@@ -783,6 +788,36 @@ export function ProfilePage({
                     </p>
                   </div>
                 </section>
+                {managementEntry ? (
+                  <section className="mt-3 rounded-lg border border-primary/20 bg-secondary/50 p-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                        {managementEntry.target === "region" ? (
+                          <MapPin size={19} />
+                        ) : (
+                          <ShieldCheck size={19} />
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <strong className="block text-sm">{managementEntry.title}</strong>
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                          {managementEntry.description}
+                        </span>
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => {
+                          setSettingsPanelOpen(false)
+                          onOpenManagement()
+                        }}
+                      >
+                        进入
+                      </Button>
+                    </div>
+                  </section>
+                ) : null}
                 <Button
                   type="button"
                   variant="ghost"

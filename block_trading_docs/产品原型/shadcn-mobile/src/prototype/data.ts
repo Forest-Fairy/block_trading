@@ -16,10 +16,13 @@ export type PageKey =
   | "messages"
   | "post-detail"
   | "product-detail"
+  | "commerce-flow"
   | "profile"
   | "membership-detail"
   | "preference-detail"
   | "assistant-chat"
+  | "region-management"
+  | "admin-console"
 export type ActivityType =
   "拼单" | "拼车" | "线下组队" | "线上开黑" | "近邻互助"
 export type ViewerMode = "member" | "guest"
@@ -300,36 +303,79 @@ function yuan(cents: number) {
   return `¥ ${cents / 100}`
 }
 
-export function getActivityDetailFields(activity: Activity): Array<[string, string]> {
+export function getActivityDetailFields(
+  activity: Activity
+): Array<[string, string]> {
   const details = activity.details ?? {}
   switch (activity.type) {
     case "拼单":
       return [
-        ["商品与规格", [details.productName, details.specification].filter(Boolean).join(" · ")],
-        ["预估人均", details.estimatedUnitAmountCent ? `${yuan(details.estimatedUnitAmountCent)} / 人` : "待协商"],
-        ["目标数量", details.targetQuantity ? `${details.targetQuantity} ${details.quantityUnit ?? "份"}` : "待确认"],
+        [
+          "商品与规格",
+          [details.productName, details.specification]
+            .filter(Boolean)
+            .join(" · "),
+        ],
+        [
+          "预估人均",
+          details.estimatedUnitAmountCent
+            ? `${yuan(details.estimatedUnitAmountCent)} / 人`
+            : "待协商",
+        ],
+        [
+          "目标数量",
+          details.targetQuantity
+            ? `${details.targetQuantity} ${details.quantityUnit ?? "份"}`
+            : "待确认",
+        ],
         ["交付方式", details.fulfillmentMode ?? "待确认"],
       ]
     case "拼车":
       return [
-        ["路线", [details.originName, details.destinationName].filter(Boolean).join(" → ")],
+        [
+          "路线",
+          [details.originName, details.destinationName]
+            .filter(Boolean)
+            .join(" → "),
+        ],
         ["上车地点", details.pickupLocation ?? "报名后确认"],
-        ["费用方式", details.fareAmountCent ? `${yuan(details.fareAmountCent)} / 人 · ${details.fareMode ?? "固定金额"}` : details.fareMode ?? "待协商"],
+        [
+          "费用方式",
+          details.fareAmountCent
+            ? `${yuan(details.fareAmountCent)} / 人 · ${details.fareMode ?? "固定金额"}`
+            : (details.fareMode ?? "待协商"),
+        ],
         ["行李限制", details.luggageRule ?? "未说明"],
       ]
     case "线下组队":
       return [
         ["活动类型", details.activityCategory ?? "线下活动"],
         ["目的地", details.destinationName ?? "待确认"],
-        ["预估人均", details.estimatedAmountCent ? `${yuan(details.estimatedAmountCent)} / 人` : "待协商"],
+        [
+          "预估人均",
+          details.estimatedAmountCent
+            ? `${yuan(details.estimatedAmountCent)} / 人`
+            : "待协商",
+        ],
         ["参与要求", details.participantRequirement ?? "未说明"],
       ]
     case "线上开黑":
       return [
-        ["游戏类目", [details.gameCategory, details.gameName].filter(Boolean).join(" · ")],
+        [
+          "游戏类目",
+          [details.gameCategory, details.gameName].filter(Boolean).join(" · "),
+        ],
         ["平台", details.platform ?? "待确认"],
-        ["活动时长", details.durationMinutes ? `预计 ${details.durationMinutes} 分钟` : "待确认"],
-        ["段位/语音", details.skillRequirement ?? details.voiceRequirement ?? "不限"],
+        [
+          "活动时长",
+          details.durationMinutes
+            ? `预计 ${details.durationMinutes} 分钟`
+            : "待确认",
+        ],
+        [
+          "段位/语音",
+          details.skillRequirement ?? details.voiceRequirement ?? "不限",
+        ],
       ]
     case "近邻互助":
       return [

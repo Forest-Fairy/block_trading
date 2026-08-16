@@ -6,6 +6,7 @@ import {
   useState,
 } from "react"
 import { BottomNav, StatusBar } from "@/components/prototype-shell"
+import { PrototypeAccessControl } from "@/components/prototype-access-control"
 import {
   getMembershipTier,
   type PageKey,
@@ -19,9 +20,12 @@ import { MallPage } from "@/pages/MallPage"
 import { MessagesPage } from "@/pages/MessagesPage"
 import { PostDetailPage } from "@/pages/PostDetailPage"
 import { ProductDetailPage } from "@/pages/ProductDetailPage"
+import { CommerceFlowPage, type CommerceStage } from "@/pages/CommerceFlowPage"
 import { ProfilePage } from "@/pages/ProfilePage"
 import { MembershipDetailPage } from "@/pages/MembershipDetailPage"
 import { PreferenceDetailPage } from "@/pages/PreferenceDetailPage"
+import { RegionManagementPage } from "@/pages/RegionManagementPage"
+import { AdminConsolePage } from "@/pages/AdminConsolePage"
 import {
   AssistantChatPage,
   type AssistantDraft,
@@ -31,17 +35,29 @@ import {
   FloatingAssistant,
   type AssistantAction,
 } from "@/components/floating-assistant"
+import {
+  canAccessAdminConsole,
+  canAccessRegionManagement,
+  getManagementSettingsEntry,
+  getPrototypeSession,
+  type AccessRole,
+  type ReleaseIteration,
+} from "@/prototype/access"
 
 type RootPageKey = Exclude<
   PageKey,
   | "post-detail"
   | "product-detail"
+  | "commerce-flow"
   | "membership-detail"
   | "preference-detail"
   | "assistant-chat"
+  | "region-management"
+  | "admin-console"
 >
 
-type PrimaryPageKey = "recommend" | "community" | "mall" | "messages" | "profile"
+type PrimaryPageKey =
+  "recommend" | "community" | "mall" | "messages" | "profile"
 
 const primaryPageKeys: PrimaryPageKey[] = [
   "recommend",
@@ -53,11 +69,17 @@ const primaryPageKeys: PrimaryPageKey[] = [
 
 function App() {
   const [page, setPage] = useState<PageKey>("recommend")
-  const [cartCount] = useState(0)
+  const [cartCount, setCartCount] = useState(0)
+  const [commerceStartStage, setCommerceStartStage] =
+    useState<CommerceStage>("cart")
+  const [pcAdminOpen, setPcAdminOpen] = useState(
+    () => window.location.hash === "#pc-admin"
+  )
   const [unreadCount, setUnreadCount] = useState(8)
   const [studentVerified, setStudentVerified] = useState(false)
   const [campusMode, setCampusMode] = useState(false)
-  const [viewerMode] = useState<ViewerMode>("member")
+  const [accessRole, setAccessRole] = useState<AccessRole>("vip")
+  const [iteration, setIteration] = useState<ReleaseIteration>("R1")
   const [currentPoints, setCurrentPoints] = useState(4)
   const [earnedPoints, setEarnedPoints] = useState(4)
   const [monthlyInvites, setMonthlyInvites] = useState(2)
@@ -108,10 +130,17 @@ function App() {
   const pageScrollPositionsRef = useRef<Partial<Record<PageKey, number>>>({})
   const historyReadyRef = useRef(false)
   const skipPageHistoryRef = useRef(false)
+  const viewerMode: ViewerMode = accessRole === "guest" ? "guest" : "member"
+  const accessSession = getPrototypeSession(accessRole)
+  const managementEntry = getManagementSettingsEntry(accessRole)
 
   // 原型用 history 哨兵模拟移动端系统返回：非首页拦截并回到业务上一层，首页放行系统事件。
   useEffect(() => {
     currentPageRef.current = page
+    if (pcAdminOpen) {
+      historyReadyRef.current = true
+      return
+    }
     if (!historyReadyRef.current) {
       window.history.replaceState({ prototypePage: page }, "", `#${page}`)
       historyReadyRef.current = true
@@ -122,10 +151,18 @@ function App() {
       return
     }
     window.history.pushState({ prototypePage: page }, "", `#${page}`)
-  }, [page])
+  }, [page, pcAdminOpen])
 
   useEffect(() => {
     const handleSystemBack = () => {
+      if (window.location.hash === "#pc-admin") {
+        setPcAdminOpen(true)
+        return
+      }
+      if (pcAdminOpen) {
+        setPcAdminOpen(false)
+        return
+      }
       const currentPage = currentPageRef.current
       if (currentPage === "recommend") return
 
@@ -136,10 +173,14 @@ function App() {
               currentPage === "product-detail" ||
               currentPage === "assistant-chat"
             ? detailReturnPage
-            : currentPage === "membership-detail" ||
-                currentPage === "preference-detail"
-              ? "profile"
-              : "recommend"
+            : currentPage === "commerce-flow"
+              ? "mall"
+              : currentPage === "membership-detail" ||
+                  currentPage === "preference-detail"
+                ? "profile"
+                : currentPage === "region-management"
+                  ? "profile"
+                  : "recommend"
       skipPageHistoryRef.current = true
       window.history.pushState(
         { prototypePage: targetPage },
@@ -151,7 +192,7 @@ function App() {
 
     window.addEventListener("popstate", handleSystemBack)
     return () => window.removeEventListener("popstate", handleSystemBack)
-  }, [detailReturnPage])
+  }, [detailReturnPage, pcAdminOpen])
 
   const saveCurrentScrollPosition = useCallback(() => {
     const content = contentScrollRef.current
@@ -159,27 +200,30 @@ function App() {
     pageScrollPositionsRef.current[currentPageRef.current] = content.scrollTop
   }, [messageChatOpen])
 
+  const resetAssistantInteraction = useCallback(() => {
+    setAssistantReleasePointer(null)
+    setAssistantFollowPointer(null)
+    setAssistantFollowEnd(null)
+  }, [])
   const navigateToPage = useCallback(
     (targetPage: PageKey) => {
       saveCurrentScrollPosition()
+      if (targetPage !== "recommend") resetAssistantInteraction()
       setMessageChatOpen(false)
       setPage(targetPage)
     },
-    [saveCurrentScrollPosition]
+    [resetAssistantInteraction, saveCurrentScrollPosition]
   )
 
-  const refreshCurrentPrimaryPage = useCallback(
-    (targetPage: PageKey) => {
-      if (!primaryPageKeys.includes(targetPage as PrimaryPageKey)) return
-      pageScrollPositionsRef.current[targetPage] = 0
-      setMessageChatOpen(false)
-      setPageRefreshes((refreshes) => ({
-        ...refreshes,
-        [targetPage]: (refreshes[targetPage as PrimaryPageKey] ?? 0) + 1,
-      }))
-    },
-    []
-  )
+  const refreshCurrentPrimaryPage = useCallback((targetPage: PageKey) => {
+    if (!primaryPageKeys.includes(targetPage as PrimaryPageKey)) return
+    pageScrollPositionsRef.current[targetPage] = 0
+    setMessageChatOpen(false)
+    setPageRefreshes((refreshes) => ({
+      ...refreshes,
+      [targetPage]: (refreshes[targetPage as PrimaryPageKey] ?? 0) + 1,
+    }))
+  }, [])
 
   // 页面组件会随路由卸载，滚动容器由 App 保持，因此在此处统一恢复来源页位置。
   useLayoutEffect(() => {
@@ -194,6 +238,7 @@ function App() {
       const isDetailPage =
         page === "post-detail" ||
         page === "product-detail" ||
+        page === "commerce-flow" ||
         page === "membership-detail" ||
         page === "preference-detail"
       content.scrollTop = isDetailPage
@@ -221,13 +266,36 @@ function App() {
   )
   const toggleCampusPreview = (enabled: boolean) => {
     // 顶部入口是原型预览快捷开关，开启时模拟当前用户已完成学生认证。
+    if (viewerMode === "guest") return
     if (enabled) setStudentVerified(true)
     setCampusMode(enabled)
   }
+  const changeAccessRole = useCallback(
+    (nextRole: AccessRole) => {
+      resetAssistantInteraction()
+      setAccessRole(nextRole)
+      setAssistantMenuOpen(false)
+      setMessageChatOpen(false)
+      if (
+        (canAccessAdminConsole(nextRole) ||
+          canAccessRegionManagement(nextRole)) &&
+        page !== "region-management" &&
+        page !== "admin-console"
+      ) {
+        setPage("profile")
+        return
+      }
+      if (page !== "region-management" && page !== "admin-console") {
+        setPage("recommend")
+      }
+    },
+    [page, resetAssistantInteraction]
+  )
   const openMessages = () => navigateToPage("messages")
   const openSearch = () => navigateToPage("search")
   const closeAssistantMenu = useCallback(() => setAssistantMenuOpen(false), [])
   const openPostDetail = (activityId: string, returnPage: RootPageKey) => {
+    resetAssistantInteraction()
     saveCurrentScrollPosition()
     setSelectedActivityId(activityId)
     setDetailReturnPage(returnPage)
@@ -235,14 +303,39 @@ function App() {
     setPage("post-detail")
   }
   const openProductDetail = (productId: string, returnPage: RootPageKey) => {
+    resetAssistantInteraction()
     saveCurrentScrollPosition()
     setSelectedProductId(productId)
     setDetailReturnPage(returnPage)
     setMessageChatOpen(false)
     setPage("product-detail")
   }
+  const openCommerceFlow = (
+    stage: CommerceStage,
+    productId = selectedProductId
+  ) => {
+    resetAssistantInteraction()
+    saveCurrentScrollPosition()
+    setSelectedProductId(productId)
+    setCommerceStartStage(stage)
+    setMessageChatOpen(false)
+    setPage("commerce-flow")
+  }
+  const openPcAdmin = () => {
+    resetAssistantInteraction()
+    setAssistantMenuOpen(false)
+    setPcAdminOpen(true)
+    window.history.pushState({ prototypePcAdmin: true }, "", "#pc-admin")
+  }
+  const closePcAdmin = () => {
+    skipPageHistoryRef.current = true
+    setPcAdminOpen(false)
+    setPage("profile")
+    window.history.replaceState({ prototypePage: "profile" }, "", "#profile")
+  }
   const selectAssistant = useCallback(
     (action: AssistantAction) => {
+      resetAssistantInteraction()
       saveCurrentScrollPosition()
       closeAssistantMenu()
       setAssistantAction(action)
@@ -250,15 +343,23 @@ function App() {
         page === "search" ||
           page === "post-detail" ||
           page === "product-detail" ||
+          page === "commerce-flow" ||
           page === "membership-detail" ||
           page === "preference-detail" ||
-          page === "assistant-chat"
+          page === "assistant-chat" ||
+          page === "region-management" ||
+          page === "admin-console"
           ? "recommend"
           : page
       )
       setPage("assistant-chat")
     },
-    [closeAssistantMenu, page, saveCurrentScrollPosition]
+    [
+      closeAssistantMenu,
+      page,
+      resetAssistantInteraction,
+      saveCurrentScrollPosition,
+    ]
   )
   const membershipTier = getMembershipTier(earnedPoints)
   const checkIn = () => {
@@ -275,6 +376,40 @@ function App() {
     setCurrentPoints((value) => value + 5)
     setEarnedPoints((value) => value + 5)
     return true
+  }
+  if (pcAdminOpen) {
+    return (
+      <div className="prototype-stage pc-admin-stage">
+        <PrototypeAccessControl
+          role={accessRole}
+          iteration={iteration}
+          onRoleChange={changeAccessRole}
+          onIterationChange={setIteration}
+          onOpenPcAdmin={openPcAdmin}
+        />
+        <section className="pc-admin-shell" aria-label="趣汇独立 PC 管理端">
+          {accessRole === "region_admin" ? (
+            <RegionManagementPage
+              key={`pc-region-${iteration}-${accessRole}`}
+              allowed={canAccessRegionManagement(accessRole)}
+              iteration={iteration}
+              regionScope={accessSession.regionScope}
+              onBack={closePcAdmin}
+              surface="pc"
+            />
+          ) : (
+            <AdminConsolePage
+              key={`pc-admin-${iteration}-${accessRole}`}
+              allowed={canAccessAdminConsole(accessRole)}
+              role={accessRole}
+              iteration={iteration}
+              onBack={closePcAdmin}
+              surface="pc"
+            />
+          )}
+        </section>
+      </div>
+    )
   }
   const content =
     page === "recommend" ? (
@@ -302,7 +437,7 @@ function App() {
         onReleaseAssistant={(pointer) => {
           closeAssistantMenu()
           setAssistantReleasePointer({ ...pointer, releasedAt: Date.now() })
-          setAssistantFollowPointer(pointer)
+          setAssistantFollowPointer(null)
           setAssistantDocked(false)
         }}
         onMoveReleasedAssistant={setAssistantFollowPointer}
@@ -335,6 +470,8 @@ function App() {
       <MallPage
         key={`mall-${pageRefreshes.mall ?? 0}`}
         cartCount={cartCount}
+        viewerMode={viewerMode}
+        onOpenCart={() => openCommerceFlow("cart")}
         onOpenProductDetail={(productId) =>
           openProductDetail(productId, "mall")
         }
@@ -347,6 +484,7 @@ function App() {
           openPostDetail(activityId, "messages")
         }
         onChatOpenChange={setMessageChatOpen}
+        viewerMode={viewerMode}
       />
     ) : page === "post-detail" ? (
       <PostDetailPage
@@ -358,7 +496,22 @@ function App() {
     ) : page === "product-detail" ? (
       <ProductDetailPage
         productId={selectedProductId}
+        viewerMode={viewerMode}
+        cartCount={cartCount}
         onBack={() => navigateToPage(detailReturnPage)}
+        onOpenCart={() => openCommerceFlow("cart")}
+        onAddToCart={() => setCartCount((count) => count + 1)}
+        onBuyNow={() => openCommerceFlow("checkout")}
+      />
+    ) : page === "commerce-flow" ? (
+      <CommerceFlowPage
+        key={`${selectedProductId}-${commerceStartStage}-${viewerMode}`}
+        productId={selectedProductId}
+        cartCount={cartCount}
+        viewerMode={viewerMode}
+        initialStage={commerceStartStage}
+        onBack={() => navigateToPage("mall")}
+        onCartCountChange={setCartCount}
       />
     ) : page === "membership-detail" ? (
       <MembershipDetailPage
@@ -383,9 +536,26 @@ function App() {
     ) : page === "assistant-chat" ? (
       <AssistantChatPage
         action={assistantAction}
+        viewerMode={viewerMode}
         initialDraft={assistantDrafts[assistantAction]}
         onClose={() => navigateToPage(detailReturnPage)}
         onSaveDraft={saveCurrentAssistantDraft}
+      />
+    ) : page === "region-management" ? (
+      <RegionManagementPage
+        key={`mobile-region-${iteration}-${accessRole}`}
+        allowed={canAccessRegionManagement(accessRole)}
+        iteration={iteration}
+        regionScope={accessSession.regionScope}
+        onBack={() => navigateToPage("profile")}
+      />
+    ) : page === "admin-console" ? (
+      <AdminConsolePage
+        key={`mobile-admin-${iteration}-${accessRole}`}
+        allowed={canAccessAdminConsole(accessRole)}
+        role={accessRole}
+        iteration={iteration}
+        onBack={() => navigateToPage("recommend")}
       />
     ) : (
       <ProfilePage
@@ -407,14 +577,30 @@ function App() {
           saveCurrentScrollPosition()
           setPage("preference-detail")
         }}
+        managementEntry={managementEntry}
+        onOpenManagement={() =>
+          navigateToPage(
+            managementEntry?.target === "region"
+              ? "region-management"
+              : "admin-console"
+          )
+        }
       />
     )
   return (
     <div className="prototype-stage">
+      <PrototypeAccessControl
+        role={accessRole}
+        iteration={iteration}
+        onRoleChange={changeAccessRole}
+        onIterationChange={setIteration}
+        onOpenPcAdmin={openPcAdmin}
+      />
       <section className="phone-shell" aria-label="趣汇移动端原型">
         <StatusBar
           campusMode={campusMode}
           onCampusModeChange={toggleCampusPreview}
+          campusEnabled={viewerMode !== "guest"}
         />
         <main
           ref={contentScrollRef}
@@ -423,7 +609,10 @@ function App() {
         >
           {content}
         </main>
-        {page !== "assistant-chat" ? (
+        {page !== "assistant-chat" &&
+        page !== "commerce-flow" &&
+        page !== "region-management" &&
+        page !== "admin-console" ? (
           <FloatingAssistant
             draftActions={Object.keys(assistantDrafts) as AssistantAction[]}
             docked={assistantDocked}
@@ -432,6 +621,7 @@ function App() {
             releasePointer={assistantReleasePointer}
             followPointer={assistantFollowPointer}
             followEnd={assistantFollowEnd}
+            onInteractionComplete={resetAssistantInteraction}
             onSelect={(action) => {
               selectAssistant(action)
             }}
@@ -440,14 +630,18 @@ function App() {
         {page !== "search" &&
         page !== "post-detail" &&
         page !== "product-detail" &&
+        page !== "commerce-flow" &&
         page !== "membership-detail" &&
         page !== "preference-detail" &&
-        page !== "assistant-chat" && !messageChatOpen ? (
+        page !== "assistant-chat" &&
+        page !== "region-management" &&
+        page !== "admin-console" &&
+        !messageChatOpen ? (
           <BottomNav
             current={page}
             onChange={navigateToPage}
             onRefresh={refreshCurrentPrimaryPage}
-            unreadCount={unreadCount}
+            unreadCount={viewerMode === "guest" ? 1 : unreadCount}
             campusMode={campusMode}
             viewerMode={viewerMode}
           />

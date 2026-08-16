@@ -22,13 +22,17 @@ import {
 export function StatusBar({
   campusMode,
   onCampusModeChange,
+  campusEnabled = true,
 }: {
   campusMode: boolean
   onCampusModeChange: (enabled: boolean) => void
+  campusEnabled?: boolean
 }) {
-  const campusLabel = campusMode
-    ? "退出校园版预览"
-    : "开启校园版预览，标识为已认证学生用户"
+  const campusLabel = !campusEnabled
+    ? "游客不可开启校园版"
+    : campusMode
+      ? "退出校园版预览"
+      : "开启校园版预览，标识为已认证学生用户"
 
   return (
     <div className="status-bar" aria-label="系统状态">
@@ -41,6 +45,7 @@ export function StatusBar({
           aria-label={campusLabel}
           aria-pressed={campusMode}
           title={campusLabel}
+          disabled={!campusEnabled}
           onClick={() => onCampusModeChange(!campusMode)}
         >
           <GraduationCap size={12} />
@@ -77,7 +82,11 @@ export function BottomNav({
     viewerMode === "guest"
       ? navItems.filter(
           ({ key }) =>
-            key === "recommend" || key === "community" || key === "profile"
+            key === "recommend" ||
+            key === "community" ||
+            key === "mall" ||
+            key === "messages" ||
+            key === "profile"
         )
       : navItems
   return (
@@ -205,7 +214,7 @@ export function CommunityCard({
         onClick={onOpenDetail}
         aria-label={`查看${activity.title}详情`}
       >
-        <div className="w-[28%] shrink-0 aspect-[22/23] overflow-hidden rounded-lg bg-muted">
+        <div className="aspect-[22/23] w-[28%] shrink-0 overflow-hidden rounded-lg bg-muted">
           <img className="image-cover" src={activity.image} alt="" />
         </div>
         <div className="min-w-0 flex-1 py-0.5">
@@ -288,19 +297,23 @@ export function CommunityCard({
 export function ProductCard({
   product,
   onOpenDetail,
+  onToggleFavorite,
 }: {
   product: (typeof products)[number]
   onOpenDetail: () => void
+  onToggleFavorite: () => void
 }) {
   return (
     <Card className="overflow-hidden border-0 shadow-[0_2px_10px_rgba(28,53,38,0.08)]">
-      <button
-        type="button"
-        className="relative block aspect-square w-full overflow-hidden bg-muted text-left"
-        onClick={onOpenDetail}
-        aria-label={`查看${product.name}详情`}
-      >
-        <img className="image-cover" src={product.image} alt={product.name} />
+      <div className="relative aspect-square overflow-hidden bg-muted">
+        <button
+          type="button"
+          className="block size-full text-left"
+          onClick={onOpenDetail}
+          aria-label={`查看${product.name}详情`}
+        >
+          <img className="image-cover" src={product.image} alt={product.name} />
+        </button>
         <Badge
           className="absolute top-2 left-2 border-0 bg-white/90 text-[0.625rem] text-primary"
           variant="outline"
@@ -313,10 +326,11 @@ export function ProductCard({
           size="icon-sm"
           className="absolute right-2 bottom-2 rounded-full bg-white/90"
           aria-label={`收藏${product.name}`}
+          onClick={onToggleFavorite}
         >
           <Heart size={15} />
         </Button>
-      </button>
+      </div>
       <CardContent className="p-3">
         <h3 className="truncate text-sm font-bold">{product.name}</h3>
         <p className="mt-1 truncate text-[0.6875rem] text-muted-foreground">

@@ -21,7 +21,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { imageUrls, products } from "@/prototype/data"
+import { imageUrls, products, type ViewerMode } from "@/prototype/data"
 import {
   IconButton,
   PageHeader,
@@ -38,9 +38,13 @@ type MallFilters = {
 
 export function MallPage({
   cartCount,
+  viewerMode,
+  onOpenCart,
   onOpenProductDetail,
 }: {
   cartCount: number
+  viewerMode: ViewerMode
+  onOpenCart: () => void
   onOpenProductDetail: (productId: string) => void
 }) {
   const [category, setCategory] = useState("推荐")
@@ -52,6 +56,7 @@ export function MallPage({
     maxPrice: "",
     sort: "",
   })
+  const [toast, setToast] = useState("")
   const categories = ["推荐", "实物商品", "会员权益", "服务产品"]
   const toggleMallFilter = (key: "categories" | "statuses", option: string) => {
     setMallFilters((current) => {
@@ -64,6 +69,10 @@ export function MallPage({
       }
     })
   }
+  const showToast = (message: string) => {
+    setToast(message)
+    window.setTimeout(() => setToast(""), 2200)
+  }
   return (
     <div className="page-content">
       <PageHeader
@@ -71,7 +80,7 @@ export function MallPage({
         title="商城"
         action={
           <span className="relative">
-            <IconButton label="查看购物车">
+            <IconButton label="查看购物车" onClick={onOpenCart}>
               <ShoppingCart size={18} />
             </IconButton>
             {cartCount > 0 ? (
@@ -107,7 +116,12 @@ export function MallPage({
             <p className="mt-2 text-xs text-muted-foreground">
               会员首单包邮 · 仅限 200 件
             </p>
-            <Button type="button" size="sm" className="mt-3 w-fit text-xs">
+            <Button
+              type="button"
+              size="sm"
+              className="mt-3 w-fit text-xs"
+              onClick={() => onOpenProductDetail(products[0].id)}
+            >
               去看看 <ChevronRight size={14} />
             </Button>
           </div>
@@ -155,6 +169,13 @@ export function MallPage({
             key={product.id}
             product={product}
             onOpenDetail={() => onOpenProductDetail(product.id)}
+            onToggleFavorite={() =>
+              showToast(
+                viewerMode === "guest"
+                  ? "完成身份认证后入会，即可收藏商品"
+                  : "已收藏商品"
+              )
+            }
           />
         ))}
       </div>
@@ -284,6 +305,11 @@ export function MallPage({
           </SheetFooter>
         </SheetContent>
       </Sheet>
+      {toast ? (
+        <div className="recommend-toast" role="status" aria-live="polite">
+          {toast}
+        </div>
+      ) : null}
     </div>
   )
 }
