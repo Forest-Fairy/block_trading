@@ -1,2 +1,2 @@
 标题,scope,路径,摘要,状态
-趣汇系统架构设计,项目文档,content.md,定义趣汇 R1-R4 Kotlin/Gradle 总体架构、Jimmer/MyBatis-Flex 组合持久化、Netty 实时通信、稳定 Service 零停机切流、SLO/告警值班、受控数据库迁移、发布回滚、日志归档与安全治理,已规划
+趣汇系统架构设计,项目文档,content.md,定义趣汇 R1-R4 Kotlin/Gradle 四层稳定接口、层内领域边界、Jimmer/MyBatis-Flex 组合持久化、OpenSearch R3 向量混合检索、Netty 实时通信和安全治理,已规划

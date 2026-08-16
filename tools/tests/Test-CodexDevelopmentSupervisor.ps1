@@ -68,14 +68,23 @@ try {
     $retryRun = Get-OnlyRunDirectory -Workspace $retryWorkspace
     $retryManifest = Read-Utf8 -Path (Join-Path $retryRun 'run.json') | ConvertFrom-Json
     $calls = Read-Utf8 -Path (Join-Path $retryWorkspace 'fake-codex-calls.log')
+    $initialInput = Read-Utf8 -Path (Join-Path $retryWorkspace 'initial-input.md')
     $resumeInput = Read-Utf8 -Path (Join-Path $retryWorkspace 'resume-input.md')
     Assert-True -Condition ($retryManifest.status -eq 'completed') -Message 'Retry scenario did not reach completed status.'
     Assert-True -Condition ($calls.Contains('worker-initial')) -Message 'Initial worker was not invoked.'
     Assert-True -Condition ($calls.Contains('prompt-composer')) -Message 'Fresh prompt composer was not invoked.'
     Assert-True -Condition ($calls.Contains('worker-resume')) -Message 'Worker conversation A was not resumed.'
+    Assert-True -Condition ($initialInput.Contains('Initial dispatch contract:')) -Message 'Initial prompt did not contain the dispatch contract.'
+    Assert-True -Condition ($initialInput.Contains('Completed with evidence; Unverified or failed; Remaining; Blockers; Next milestone; First next action.')) -Message 'Initial prompt did not require the structured progress checkpoint.'
     Assert-True -Condition ($resumeInput.Contains('DYNAMIC_RECOVERY_PROMPT')) -Message 'Resume input did not use the composed prompt.'
     Assert-True -Condition ($resumeInput.Contains('WORKER_PROGRESS_PHASE_1')) -Message 'Resume input did not carry previous progress.'
     Assert-True -Condition (Test-Path -LiteralPath (Join-Path $retryRun 'attempt-002-recovery-context.md')) -Message 'Recovery context was not persisted.'
+    $recoveryContext = Read-Utf8 -Path (Join-Path $retryRun 'attempt-002-recovery-context.md')
+    Assert-True -Condition ($recoveryContext.Contains('exactly four states: completed with evidence, unverified, incomplete, and blocked')) -Message 'Recovery composer did not receive the four-state evidence contract.'
+    Assert-True -Condition ($recoveryContext.Contains('## Current runtime progress')) -Message 'Recovery context did not include runtime progress.'
+    $unicodeProbe = ([char]0x8DA3).ToString() + ([char]0x6C47).ToString() + ([char]0x4EA7).ToString() + ([char]0x54C1).ToString()
+    $attemptLog = Read-Utf8 -Path (Join-Path $retryRun 'attempt-001.log')
+    Assert-True -Condition ($attemptLog.Contains($unicodeProbe)) -Message 'Attempt log did not preserve the UTF-8 Chinese probe.'
     Write-Host 'PASS TEST 1'
 
     Write-Host 'TEST 2: 10-second timeout stops scheduling and preserves active worker'

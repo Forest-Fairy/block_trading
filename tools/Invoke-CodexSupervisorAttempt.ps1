@@ -29,7 +29,7 @@ param(
     [string]$ResultFile,
 
     [ValidateNotNullOrEmpty()]
-    [string]$OutputCaptureCommand = (Join-Path $PSScriptRoot 'Write-CodexSupervisorOutput.ps1'),
+    [string]$OutputCaptureCommand,
 
     [string]$ConversationId,
 
@@ -40,6 +40,10 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+if ([string]::IsNullOrWhiteSpace($OutputCaptureCommand)) {
+    $OutputCaptureCommand = Join-Path $PSScriptRoot 'Write-CodexSupervisorOutput.ps1'
+}
 
 function Write-Utf8NoBom {
     param(
@@ -122,9 +126,17 @@ try {
     }
 
     $previousErrorActionPreference = $ErrorActionPreference
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    $previousOutputEncoding = $OutputEncoding
+    $previousConsoleOutputEncoding = [Console]::OutputEncoding
+    $previousConsoleInputEncoding = [Console]::InputEncoding
     try {
         # Native stderr is part of the attempt log and must not abort the JSONL capture pipeline.
         $ErrorActionPreference = 'Continue'
+        # Windows PowerShell 5.1 defaults native stdin to an ANSI code page. Codex JSONL is UTF-8.
+        $OutputEncoding = $utf8NoBom
+        [Console]::OutputEncoding = $utf8NoBom
+        [Console]::InputEncoding = $utf8NoBom
         $promptText = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes($promptPath))
         $promptText |
             & $codexExecutable @codexArguments 2>&1 |
@@ -133,6 +145,9 @@ try {
     }
     finally {
         $ErrorActionPreference = $previousErrorActionPreference
+        $OutputEncoding = $previousOutputEncoding
+        [Console]::OutputEncoding = $previousConsoleOutputEncoding
+        [Console]::InputEncoding = $previousConsoleInputEncoding
     }
 
     $record.status = 'finished'
@@ -142,12 +157,18 @@ catch {
     $record.status = 'failed-to-run'
     $record.error = $_.Exception.Message
     $errorText = $_ | Out-String
+    $record.errorDetail = $errorText
     if (Test-Path -LiteralPath $LogFile -PathType Leaf) {
-        [System.IO.File]::AppendAllText(
-            $LogFile,
-            [Environment]::NewLine + $errorText,
-            (New-Object System.Text.UTF8Encoding($false))
-        )
+        try {
+            [System.IO.File]::AppendAllText(
+                $LogFile,
+                [Environment]::NewLine + $errorText,
+                (New-Object System.Text.UTF8Encoding($false))
+            )
+        }
+        catch {
+            # The capture process can own the file while its error is propagated.
+        }
     }
     else {
         Write-Utf8NoBom -Path $LogFile -Content $errorText

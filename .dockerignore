@@ -1,0 +1,14 @@
+.git
+.gradle
+.planning
+.codex-supervisor
+**/build
+!block_trading_server/block_trading_user_interface/block_trading_ui_client_gateway_boot/build
+!block_trading_server/block_trading_user_interface/block_trading_ui_client_gateway_boot/build/libs
+!block_trading_server/block_trading_user_interface/block_trading_ui_client_gateway_boot/build/libs/*-SNAPSHOT.jar
+block_trading_client/node_modules
+block_trading_client/dist
+block_trading_client/test-results
+block_trading_client/playwright-report
+block_trading_docs/产品原型/**/node_modules
+block_trading_docs/产品原型/**/dist

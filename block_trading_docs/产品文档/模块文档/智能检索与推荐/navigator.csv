@@ -1,0 +1,2 @@
+标题,scope,路径,摘要,状态
+智能检索与推荐,模块文档,content.md,规划 R3 默认关闭的 OpenSearch 向量与关键词混合检索、可替换多语言 Embedding Provider、模型治理、权限过滤、降级和验收边界,详细规划完成

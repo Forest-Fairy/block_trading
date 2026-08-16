@@ -2,23 +2,27 @@
 
 ## 项目架构
 ### 后端技术栈
- kotlin, gradle kotlin dsl, springboot 4, spring-cloud, spring-embabel, jimmer, mybatis-flex, netty
+ Kotlin, Gradle Kotlin DSL, Spring Boot 4, Spring Cloud, Spring Embabel, Jimmer, MyBatis-Flex, Netty, OpenSearch Java Client
 ### 前端技术栈
  vite, react, uniapp(主要用于小程序兼容)
 ### 中间件
- nacos, redis, rabbitmq, minio
+ Oracle Free, Redis, RabbitMQ, MinIO, OpenSearch
+### 观测与交付
+ OpenTelemetry Collector, Prometheus, Grafana, Docker Compose, Docker
+### 智能检索（R3 规划，默认关闭）
+ OpenSearch k-NN 向量索引与混合检索；通过可替换 Embedding Provider 调用经模型治理批准的多语言向量模型。当前 R1 仅启用关键词/结构化检索，不部署独立向量数据库或模型运行时。
 ### 外围组件
- libreoffic, sevenzipJbinding
+ LibreOffice, sevenzipJBinding；Nacos 为既有服务治理技术选型，未纳入当前 R1 Docker Compose 运行栈。
 ## 项目范围
 以 DDD 作为系统架构指导, 六边形架构作为模块分层指导,
 
 ## 当前入口与模块状态
 
-- 根目录 `pom.xml` 是当前仅用于 `block_trading_docs` 的过渡构建入口；创建任一后端生产模块前，必须一次性迁移为 Gradle Kotlin DSL 多项目构建。`block_trading_bom`、`block_trading_server`、`block_trading_client` 和 `block_trading_deployment` 是保留名称和边界的目标模块，目录与实现尚未创建。
-- 目标根模块固定为 `block_trading_docs`、`block_trading_bom`、`block_trading_server`、`block_trading_client`、`block_trading_deployment`。`block_trading_bom` 使用 Gradle Java Platform 与 Version Catalog 统一后端依赖和插件版本；`block_trading_server` 是 Gradle 后端根；`block_trading_client` 是独立 Node 多端前端根，不进入 Gradle Build；`block_trading_deployment` 只承载镜像、环境清单、版本化数据库迁移、稳定 Service 切流、连接排空、发布回滚和运维脚本。
-- `block_trading_server` 下按 `block_trading_user_interface`、`block_trading_application`、`block_trading_domain`、`block_trading_infrastructure` 四层组织生产代码，并分别设置层测试父模块与 `block_trading_system_test`。独立部署服务只在明确的业务模块内创建 `*_boot`，不建立统一 Runtime。
+- 根目录已经迁移为 Gradle Kotlin DSL 多项目构建，权威入口为 Gradle Wrapper、`settings.gradle.kts`、根 `build.gradle.kts` 与 Version Catalog；原 Maven 过渡构建已移除。统一检查命令为 `./gradlew check`，文档门禁为 `./gradlew :block_trading_docs:check`。
+- 根模块固定为 `block_trading_docs`、`block_trading_bom`、`block_trading_server`、独立 Node 根 `block_trading_client` 和 `block_trading_deployment`。`block_trading_bom`、四层后端、R1 Boot/Test 与 deployment 聚合已创建；生产代码、生产客户端与部署资产按 R1 里程碑持续补齐。`block_trading_client` 不进入 Gradle Build。
+- `block_trading_server` 固定保留 `block_trading_user_interface`、`block_trading_application`、`block_trading_domain`、`block_trading_infrastructure` 四个生产一级层和 `block_trading_system_test`；各层内部继续使用 `api/adapter/service/test/boot` 接口形态，并按已审查限界上下文拆分当前 `block_trading_d_r1_*`、`block_trading_a_r1_*`、`block_trading_i_r1_test` 等周期聚合模块。禁止把领域平铺到 server 一级，也禁止继续新增 `*_rN_*` 模块。
 - `block_trading_client` 下按终端划分 `block_trading_web_mobile`、`block_trading_mini_program`（R1）、`block_trading_mobile`（下分 Android、iOS，R3）、`block_trading_web_pc`（下分仅内部使用的 `block_trading_web_pc_admin`，R1，及用户侧 `block_trading_web_pc_user`，R4）和 `block_trading_tablet`（R4）；它们只能通过版本化 UserInterface API 与后端通信。
-- 外部 HTTP、WebSocket、RPC、文件和第三方回调只能进入 UserInterface Adapter；当前没有已实现的后端外部入口。
+- 外部 HTTP、WebSocket、RPC、文件和第三方回调只能进入 UserInterface Adapter；R1 版本化接口契约已写入业务模块文档，生产实现处于实施中。
 - 当前可运行的前端入口是 `block_trading_docs/产品原型/shadcn-mobile`：执行 `npm run dev` 启动 Vite 原型。该目录是 Web 移动、小程序、Android 与 iOS 的统一移动交互参考，不等同于尚未创建的 `block_trading_client` 生产工程。
 
 ## 模块架构入口

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qh.local/schema/r1-events.schema.json",
+  "title": "趣汇 R1 RabbitMQ 可靠事件信封",
+  "description": "生产者向 qh.r1.events 交换机发布完整信封；消费者以 consumerCode + eventId 写入 Inbox 去重，失败最多重试 3 次后拒绝并进入 qh.r1.events.dead。",
+  "type": "object",
+  "required": ["eventId", "eventType", "eventVersion", "aggregateType", "aggregateId", "occurredAt", "requestId", "deploymentNo", "payload"],
+  "properties": {
+    "eventId": {"type": "string", "minLength": 1, "maxLength": 64},
+    "eventType": {"type": "string", "enum": ["identity.student-verification.status-changed.v1", "community.post.submitted.v1", "community.post.joined.v1", "community.post.left.v1", "community.comment.created.v1", "governance.report.submitted.v1", "engagement.message.accepted.v1", "benefit.check-in.completed.v1", "governance.moderation.decided.v1", "commerce.order.confirmed.v1"]},
+    "eventVersion": {"type": "integer", "const": 1},
+    "aggregateType": {"type": "string", "enum": ["STUDENT_VERIFICATION", "POST", "POST_COMMENT", "REPORT", "CHAT_MESSAGE", "MEMBERSHIP", "MODERATION_CASE", "ORDER"]},
+    "aggregateId": {"type": "string", "minLength": 1, "maxLength": 64},
+    "aggregateVersion": {"type": "integer", "minimum": 0},
+    "occurredAt": {"type": "string", "format": "date-time"},
+    "requestId": {"type": "string", "minLength": 1, "maxLength": 64},
+    "traceId": {"type": ["string", "null"], "maxLength": 64},
+    "deploymentNo": {"type": "string", "minLength": 1, "maxLength": 64},
+    "payload": {"type": "object"}
+  },
+  "additionalProperties": false
+}

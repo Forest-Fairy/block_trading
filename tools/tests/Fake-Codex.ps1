@@ -1,5 +1,9 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+$OutputEncoding = $utf8NoBom
+[Console]::OutputEncoding = $utf8NoBom
+[Console]::InputEncoding = $utf8NoBom
 
 function Write-Utf8NoBom {
     param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$Content)
@@ -24,6 +28,7 @@ $prompt = ($input | Out-String)
 $isComposer = $allArguments -contains '--ephemeral'
 $isResume = $allArguments -contains 'resume'
 $role = if ($isComposer) { 'prompt-composer' } elseif ($isResume) { 'worker-resume' } else { 'worker-initial' }
+$unicodeProbe = ([char]0x8DA3).ToString() + ([char]0x6C47).ToString() + ([char]0x4EA7).ToString() + ([char]0x54C1).ToString()
 
 $callLog = Join-Path $workspace 'fake-codex-calls.log'
 [System.IO.File]::AppendAllText(
@@ -50,7 +55,9 @@ Inspect the workspace, then finish remaining validation without restarting.
 
 $threadId = '11111111-2222-4333-8444-555555555555'
 if (-not $isResume) {
+    Write-Utf8NoBom -Path (Join-Path $workspace 'initial-input.md') -Content $prompt
     Write-Output ('{{"type":"thread.started","thread_id":"{0}"}}' -f $threadId)
+    Write-Output ('{{"type":"item.completed","item":{{"type":"agent_message","text":"{0}"}}}}' -f $unicodeProbe)
 }
 
 if ($prompt.Contains('TEST_TIMEOUT')) {

@@ -1,2 +1,2 @@
 标题,scope,路径,摘要,状态
-趣汇 DDD、六边形与 TDD 模块规划,项目文档,content.md,定义 Kotlin/Gradle 多项目构建、后端四层、Netty 实时 Gateway、Jimmer/MyBatis-Flex 组合 Repository、测试父模块、多端客户端、业务 Boot 与零停机发布脚本；禁止统一 Runtime,已规划
+趣汇分层接口稳定、层内领域化的 DDD、六边形与 TDD 模块规划,项目文档,content.md,保留 UI/Application/Domain/Infrastructure 四个一级层及 API/Adapter/Test/Boot 接口，在各层内按限界上下文替换 r1 周期聚合模块并渐进迁移,详细规划完成

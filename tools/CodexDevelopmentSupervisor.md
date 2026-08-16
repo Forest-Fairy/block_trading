@@ -4,7 +4,9 @@
 
 `Invoke-CodexDevelopmentSupervisor.ps1` 用于在当前仓库启动 Codex 系统开发任务，并在 Codex 工作会话异常退出但尚未报告完成时，根据实际进度重组提示词并持续恢复同一个 Codex 工作会话。
 
-监督器首次调用 `codex exec --json`，从 `thread.started` 事件中保存工作会话 A 的 UUID。工作尝试未完成时，监督器会启动一个全新的只读、ephemeral 提示词调度会话，根据原始任务、上一轮最后消息、日志尾部、退出码、`git status --short` 和 `git diff --stat` 生成新的恢复提示词。随后固定调用 `codex exec resume <会话 UUID>` 恢复工作会话 A，不会使用可能与其他并发线程冲突的 `--last`。
+监督器首次调用 `codex exec --json`，从 `thread.started` 事件中保存工作会话 A 的 UUID。首次提示词固定最终目标，要求工作会话先建立验收里程碑，再按文档/接口、构建与运行时、后端与数据、生产前端、部署与中间件、自动化与系统验证、文档收口的门禁顺序推进。未完成时必须输出“已完成证据、未验证或失败、剩余项、阻塞、下一里程碑、首个下一动作”检查点。
+
+工作尝试未完成时，监督器会启动一个全新的只读、ephemeral 提示词调度会话，根据原始任务、上一轮最后消息、日志尾部、退出码、`git status --short`、`git diff --name-status`、`git diff --stat` 和 Docker 运行快照生成新的恢复提示词。恢复提示词必须将进度重组为“有证据完成、未验证、未完成、阻塞”四态，只选择一个下一端到端里程碑，并给出验收证据和首个具体动作。随后固定调用 `codex exec resume <会话 UUID>` 恢复工作会话 A，不会使用可能与其他并发线程冲突的 `--last`。
 
 如果提示词调度会话失败或没有输出有效提示词，监督器会使用包含同一批进度证据的确定性回退提示词，避免恢复链路中断。如果首次工作尝试未能产生会话 UUID，下一轮会使用重组后的提示词创建新的工作会话。
 
@@ -74,6 +76,7 @@
 每次监督运行的数据保存在 `.codex-supervisor/runs/<运行标识>/`，包括：
 
 - `run.json`：运行清单、任务文件、会话 UUID 和实际超时模式。
+- `run.json` 中的 `promptContractVersion`：本次使用的首次/恢复提示词契约版本。
 - `conversation-id.txt`：固定恢复的 Codex 会话 UUID。
 - `attempt-*.log`：每次执行或恢复的输出日志。
 - `attempt-*-last-message.md`：Codex 每次尝试的最后一条消息。
@@ -88,6 +91,8 @@
 - `watcher.stop`：正常完成或监督器退出时写入的监听停止信号。
 - `timeout.json`：监听进程到达总超时时写入的调度停止信号。
 
+所有任务、提示词、最后消息、JSONL 尝试日志和运行记录均使用 UTF-8 无 BOM。attempt runner 在调用原生 `codex` 前显式设置 Windows PowerShell 5.1 的 `$OutputEncoding`、控制台输入和输出编码为 UTF-8，并在退出时恢复宿主设置；输出捕获器也以 UTF-8 写入。因此日志中的中文应按 UTF-8 读取，不能依赖 Git Bash、OEM 或系统 ANSI 代码页猜测。
+
 若需要人工停止监督器，使用 `Ctrl+C`。人工停止后不会自动继续；再次启动脚本会创建新的监督运行。
 
 ## 测试
@@ -98,4 +103,4 @@
 & '.\tools\tests\Test-CodexDevelopmentSupervisor.ps1'
 ```
 
-测试覆盖动态进度提示词重组、固定工作会话恢复、完成信号，以及 10 秒超时后监督器停止但活跃工作进程继续运行。
+测试覆盖动态进度提示词重组、固定工作会话恢复、UTF-8 中文 JSONL 日志探针、完成信号，以及 10 秒超时后监督器停止但活跃工作进程继续运行。

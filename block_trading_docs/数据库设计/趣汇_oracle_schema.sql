@@ -113,13 +113,56 @@ CREATE TABLE qh_student_verification (
     campus_id NUMBER(19) NOT NULL,
     real_name_masked VARCHAR2(80 CHAR),
     student_no_masked VARCHAR2(80 CHAR),
+    student_no_digest VARCHAR2(64 CHAR),
+    asset_id NUMBER(19),
     verification_status VARCHAR2(24 CHAR) NOT NULL,
     submitted_at TIMESTAMP(6) NOT NULL,
     verified_at TIMESTAMP(6),
     reject_reason VARCHAR2(500 CHAR),
+    reviewed_by_user_id NUMBER(19),
+    reviewed_at TIMESTAMP(6),
+    revoked_at TIMESTAMP(6),
+    revoke_reason VARCHAR2(500 CHAR),
+    version NUMBER(10) DEFAULT 0 NOT NULL,
     created_at TIMESTAMP(6) NOT NULL,
     updated_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT ck_qh_student_status CHECK (verification_status IN ('PENDING','VERIFIED','REJECTED','EXPIRED','REVOKED')),
     CONSTRAINT pk_qh_student_verification PRIMARY KEY (id)
+);
+
+CREATE UNIQUE INDEX uk_qh_student_current ON qh_student_verification (
+    CASE WHEN verification_status IN ('PENDING','VERIFIED') THEN user_id END
+);
+
+CREATE INDEX ix_qh_student_review_queue ON qh_student_verification (
+    verification_status, campus_id, submitted_at, id
+);
+
+CREATE TABLE qh_risk_challenge (
+    id NUMBER(19) NOT NULL,
+    challenge_id VARCHAR2(64 CHAR) NOT NULL,
+    user_id NUMBER(19) NOT NULL,
+    scene_type VARCHAR2(64 CHAR) NOT NULL,
+    challenge_type VARCHAR2(24 CHAR) NOT NULL,
+    challenge_status VARCHAR2(24 CHAR) NOT NULL,
+    otp_digest VARCHAR2(64 CHAR) NOT NULL,
+    expires_at TIMESTAMP(6) NOT NULL,
+    passed_at TIMESTAMP(6),
+    consumed_at TIMESTAMP(6),
+    failed_attempt_count NUMBER(3) DEFAULT 0 NOT NULL,
+    max_attempts NUMBER(3) DEFAULT 5 NOT NULL,
+    request_id VARCHAR2(64 CHAR) NOT NULL,
+    created_at TIMESTAMP(6) NOT NULL,
+    updated_at TIMESTAMP(6) NOT NULL,
+    CONSTRAINT pk_qh_risk_challenge PRIMARY KEY (id),
+    CONSTRAINT uk_qh_risk_challenge_id UNIQUE (challenge_id),
+    CONSTRAINT ck_qh_risk_challenge_type CHECK (challenge_type IN ('OTP')),
+    CONSTRAINT ck_qh_risk_challenge_status CHECK (challenge_status IN ('PENDING','PASSED','CONSUMED','EXPIRED','FAILED')),
+    CONSTRAINT ck_qh_risk_challenge_attempts CHECK (failed_attempt_count >= 0 AND max_attempts BETWEEN 1 AND 10)
+);
+
+CREATE INDEX ix_qh_risk_challenge_user ON qh_risk_challenge (
+    user_id, scene_type, challenge_status, expires_at
 );
 
 CREATE TABLE qh_region (
@@ -610,10 +653,15 @@ CREATE TABLE qh_post_comment (
     content VARCHAR2(2000 CHAR) NOT NULL,
     status VARCHAR2(24 CHAR) NOT NULL,
     reply_count NUMBER(10) DEFAULT 0 NOT NULL,
+    request_id VARCHAR2(64 CHAR),
+    idempotency_key VARCHAR2(128 CHAR),
+    version NUMBER(10) DEFAULT 0 NOT NULL,
     created_at TIMESTAMP(6) NOT NULL,
     updated_at TIMESTAMP(6) NOT NULL,
     CONSTRAINT pk_qh_post_comment PRIMARY KEY (id)
 );
+
+CREATE UNIQUE INDEX uk_qh_comment_idempotency ON qh_post_comment (author_id, idempotency_key);
 
 CREATE TABLE qh_report (
     id NUMBER(19) NOT NULL,
@@ -626,7 +674,12 @@ CREATE TABLE qh_report (
     handled_by NUMBER(19),
     handled_at TIMESTAMP(6),
     result_note VARCHAR2(1000 CHAR),
+    evidence_asset_id NUMBER(19),
+    region_id NUMBER(19),
+    request_id VARCHAR2(64 CHAR),
+    idempotency_key VARCHAR2(128 CHAR),
     created_at TIMESTAMP(6) NOT NULL,
+    updated_at TIMESTAMP(6),
     CONSTRAINT uk_qh_report_once UNIQUE (reporter_id, target_type, target_id),
     CONSTRAINT pk_qh_report PRIMARY KEY (id)
 );
@@ -699,7 +752,6 @@ CREATE TABLE qh_chat_read_cursor (
     last_read_message_id NUMBER(19),
     last_read_at TIMESTAMP(6),
     updated_at TIMESTAMP(6) NOT NULL,
-    CONSTRAINT uk_qh_chat_cursor UNIQUE (room_id, user_id),
     CONSTRAINT pk_qh_chat_read_cursor PRIMARY KEY (room_id, user_id)
 );
 
@@ -911,6 +963,9 @@ CREATE TABLE qh_payment (
     CONSTRAINT pk_qh_payment PRIMARY KEY (id)
 );
 
+CREATE UNIQUE INDEX uk_qh_report_idempotency ON qh_report (reporter_id, idempotency_key);
+CREATE INDEX ix_qh_report_region_status ON qh_report (region_id, status, created_at);
+
 CREATE TABLE qh_group_buy_settlement (
     id NUMBER(19) NOT NULL,
     settlement_no VARCHAR2(40 CHAR) NOT NULL,
@@ -1102,6 +1157,11 @@ CREATE TABLE qh_support_ticket (
     content CLOB NOT NULL,
     related_type VARCHAR2(24 CHAR),
     related_id NUMBER(19),
+    region_id NUMBER(19),
+    priority VARCHAR2(16 CHAR) DEFAULT 'NORMAL' NOT NULL,
+    queue_code VARCHAR2(64 CHAR) DEFAULT 'GENERAL' NOT NULL,
+    first_response_due_at TIMESTAMP(6),
+    resolution_due_at TIMESTAMP(6),
     status VARCHAR2(24 CHAR) NOT NULL,
     handled_by NUMBER(19),
     handled_at TIMESTAMP(6),
@@ -1149,10 +1209,14 @@ CREATE TABLE qh_share_link (
     landing_path VARCHAR2(500 CHAR),
     status VARCHAR2(16 CHAR) NOT NULL,
     expires_at TIMESTAMP(6),
+    request_id VARCHAR2(64 CHAR),
+    idempotency_key VARCHAR2(128 CHAR),
     created_at TIMESTAMP(6) NOT NULL,
     CONSTRAINT uk_qh_share_link_code UNIQUE (share_code),
     CONSTRAINT pk_qh_share_link PRIMARY KEY (id)
 );
+
+CREATE UNIQUE INDEX uk_qh_share_idempotency ON qh_share_link (sharer_id, idempotency_key);
 
 CREATE TABLE qh_user_behavior_event (
     id NUMBER(19) NOT NULL,

@@ -161,6 +161,7 @@ function Get-GitProgressSnapshot {
         $ErrorActionPreference = 'Continue'
         $status = (& git -C $WorkspacePath status --short 2>&1 | Out-String).Trim()
         $diffStat = (& git -C $WorkspacePath diff --stat 2>&1 | Out-String).Trim()
+        $diffNames = (& git -C $WorkspacePath diff --name-status 2>&1 | Out-String).Trim()
     }
     catch {
         return "Git progress inspection failed: $($_.Exception.Message)"
@@ -170,7 +171,30 @@ function Get-GitProgressSnapshot {
     }
     if ([string]::IsNullOrWhiteSpace($status)) { $status = '(working tree is clean)' }
     if ([string]::IsNullOrWhiteSpace($diffStat)) { $diffStat = '(no diff stat)' }
-    return "git status --short:`n$status`n`ngit diff --stat:`n$diffStat"
+    if ([string]::IsNullOrWhiteSpace($diffNames)) { $diffNames = '(no changed tracked files)' }
+    return "git status --short:`n$status`n`ngit diff --name-status:`n$diffNames`n`ngit diff --stat:`n$diffStat"
+}
+
+function Get-RuntimeProgressSnapshot {
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $dockerCommand = Get-Command docker -ErrorAction SilentlyContinue
+        if ($null -eq $dockerCommand) {
+            return 'Docker CLI is not available.'
+        }
+        $serverVersion = (& docker version --format '{{.Server.Version}}' 2>&1 | Out-String).Trim()
+        $containers = (& docker ps --format '{{.Names}}|{{.Image}}|{{.Status}}|{{.Ports}}' 2>&1 | Out-String).Trim()
+        if ([string]::IsNullOrWhiteSpace($serverVersion)) { $serverVersion = '(server unavailable)' }
+        if ([string]::IsNullOrWhiteSpace($containers)) { $containers = '(no running containers)' }
+        return "Docker server: $serverVersion`nRunning containers:`n$containers"
+    }
+    catch {
+        return "Runtime progress inspection failed: $($_.Exception.Message)"
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
 }
 
 function Set-ManifestTimeout {
@@ -236,27 +260,35 @@ $manifest = [ordered]@{
     timeoutHours = $TimeoutHours
     timeoutMode = if ($DebugMode) { 'debug-seconds' } else { 'hours' }
     timeoutBehavior = 'stop-scheduling-preserve-active-attempt'
+    promptContractVersion = 2
 }
 if ($DebugMode) { $manifest['timeoutSeconds'] = $DebugTimeoutSeconds }
 Write-Utf8NoBom -Path $manifestFile -Content ($manifest | ConvertTo-Json -Depth 5)
 
 $taskText = Read-Utf8 -Path $taskFilePath
 $prompt = @"
-You are worker conversation A for a system-development task in this repository. Complete the task directly in the existing workspace. Do not overwrite or revert changes made by other threads.
+You are worker conversation A for a long-running system-development task in this repository. Own the final outcome end to end in the existing workspace. Do not overwrite or revert changes made by other threads.
 
 Task file: $taskFilePath
 Run ID: $runId
 Completion record: $completionFile
 
-Rules:
-1. Read project rules, PROJECT.md, and only the document sections needed for this task. Follow the project's Chinese development-document requirements.
-2. Other Codex threads may be active. Do not modify .planning/.active_plan. Never delete, reset, or revert existing workspace changes.
-3. Inspect the completion record first. If status is completed and runId matches this run, stop immediately without duplicating work.
-4. Run the following completion command exactly once only after implementation, required documentation, and task-appropriate validation are complete:
+Initial dispatch contract:
+1. Inspect the completion record first. If status is completed and runId matches this run, stop immediately without duplicating work.
+2. Read project rules, PROJECT.md, the task file, and only the document sections needed for the current milestone. Follow the project's Chinese development-document requirements.
+3. Inspect the dirty worktree and existing implementation before editing. Other Codex threads may be active. Do not modify .planning/.active_plan. Never delete, reset, or revert existing workspace changes.
+4. Convert the final objective and acceptance criteria into an evidence-backed milestone checklist. Keep the final objective immutable; a partial prototype, mock-only path, passing subset, or time limit is not completion.
+5. Execute the smallest complete end-to-end milestone at a time. Unless the task file requires another order, use these gates: required documentation and interface contracts; build/runtime foundation; backend and data path; production frontend integration; deployment and middleware; automated and visual/system validation; documentation closeout.
+6. Before crossing an interface or persistence boundary, update the required contract or migration documentation. Reuse project patterns and verify each milestone before starting the next one.
+7. You have unattended execution access for normal in-scope development, Docker, build, test, and deployment work. Preserve unrelated containers and user data. Do not broaden scope, publish externally, or perform destructive recovery operations.
+8. Prefer fixing blockers and continuing over stopping to ask questions when repository evidence supports a safe in-scope decision.
+
+Completion protocol:
+- Run the following completion command exactly once only after every acceptance criterion has implementation evidence and all task-required documentation, builds, tests, runtime checks, and deployment checks are complete:
 
 & '$completionCommand' -CompletionFile '$completionFile' -RunId '$runId' -Summary '<concise Chinese completion summary>' -ValidationSummary '<commands run and results>'
 
-5. If this turn cannot finish the task, do not run the completion command. Preserve valid changes and diagnostics. In the final message report completed work, major changes, validation, failures or blockers, and the first next action. The scheduler will rebuild the next prompt from this progress and resume this conversation.
+- If this attempt cannot finish the task, do not run the completion command. Preserve valid changes and diagnostics. End with a compact progress checkpoint containing exactly these headings: Completed with evidence; Unverified or failed; Remaining; Blockers; Next milestone; First next action. The scheduler will use that checkpoint plus repository and runtime evidence to rebuild the prompt and resume this same conversation.
 
 The following UTF-8 task file content is the stable final objective. Project-facing output must remain Chinese:
 
@@ -388,6 +420,7 @@ try {
         $previousLastMessage = Read-Utf8Snippet -Path $lastMessage -MaximumCharacters 16000
         $previousLogTail = Read-Utf8Snippet -Path $attemptLog -MaximumCharacters 16000
         $gitProgress = Get-GitProgressSnapshot -WorkspacePath $workspacePath
+        $runtimeProgress = Get-RuntimeProgressSnapshot
         $workerSessionDescription = if ([string]::IsNullOrWhiteSpace($conversationId)) {
             '(not captured; the next worker will start a new conversation)'
         }
@@ -403,10 +436,13 @@ You are a fresh, read-only prompt-composer Codex session, not the worker. Do not
 Requirements:
 - Output only the worker prompt body. Do not explain your analysis.
 - Preserve the stable final objective, Run ID, completion record, and completion command.
-- Distinguish completed, unverified, incomplete, and blocked items from evidence. Never guess completion.
-- Tell the worker to inspect the workspace and completion record first, then continue the highest-priority incomplete end-to-end item.
+- Start with the immutable final outcome, then synthesize an evidence ledger with exactly four states: completed with evidence, unverified, incomplete, and blocked. Never infer completion from plans, file presence, or claims without validation evidence.
+- Select exactly one next end-to-end milestone that most directly advances the final outcome. Include its acceptance evidence and the first concrete files or commands to inspect. Do not redesign the whole project unless evidence proves the design is invalid.
+- Tell the worker to inspect the completion record and current workspace first, verify inherited changes, then continue that milestone. Preserve already validated work and avoid broad rereads.
 - Do not restart, revert existing changes, or repeat a deterministic failing command unchanged.
-- If the task remains incomplete, require a structured progress summary in the worker's final message.
+- Convert known failures into an adjusted action or diagnostic step. Call out missing runtime dependencies only when supported by the runtime snapshot.
+- If the task remains incomplete, require the same structured progress checkpoint: Completed with evidence; Unverified or failed; Remaining; Blockers; Next milestone; First next action.
+- Do not weaken or narrow acceptance criteria to fit the current attempt. Only include the completion command after the evidence ledger and execution instructions.
 
 ## Stable task information
 
@@ -431,11 +467,14 @@ $previousLogTail
 
 ## Current Git progress
 $gitProgress
+
+## Current runtime progress
+$runtimeProgress
 "@
         Write-Utf8NoBom -Path $recoveryContextFile -Content $recoveryContext
 
-        $fallbackPrompt = @"
-Continue the same development task with the stable final objective unchanged. Inspect the completion record, workspace, and validation results first, then continue from the last incomplete end-to-end item. Do not restart, revert existing changes, or repeat a deterministic failing command unchanged. Project-facing output must remain Chinese.
+$fallbackPrompt = @"
+Continue the same development task with the stable final objective unchanged. Inspect the completion record and current workspace first. Reconcile inherited changes against the evidence below, preserve validated work, and continue exactly one highest-priority incomplete end-to-end milestone. Do not restart, revert existing changes, broadly reread settled context, or repeat a deterministic failing command unchanged. Project-facing output must remain Chinese.
 
 Run ID: $runId
 Completion record: $completionFile
@@ -447,13 +486,19 @@ Previous exit code: $workerExitCode
 Previous final message:
 $previousLastMessage
 
+Previous log tail:
+$previousLogTail
+
 Current Git progress:
 $gitProgress
+
+Current runtime progress:
+$runtimeProgress
 
 Run the following command exactly once only after implementation, required documentation, and validation are complete:
 & '$completionCommand' -CompletionFile '$completionFile' -RunId '$runId' -Summary '<concise Chinese completion summary>' -ValidationSummary '<commands run and results>'
 
-If the task remains incomplete, do not run the completion command. Preserve progress and report completed work, major changes, validation, failures or blockers, and the next action in the final message.
+If the task remains incomplete, do not run the completion command. Preserve progress and end with these headings: Completed with evidence; Unverified or failed; Remaining; Blockers; Next milestone; First next action.
 "@
         Write-Utf8NoBom -Path $fallbackPromptFile -Content $fallbackPrompt
 

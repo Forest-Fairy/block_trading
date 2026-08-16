@@ -36,7 +36,7 @@
 | 入口类型 | 当前入口 | 当前状态 | 允许访问的边界 |
 |---|---|---|---|
 | Maven 构建入口 | 根目录 `pom.xml` | 当前只聚合 `block_trading_docs` | 文档构建与校验 |
-| 后端目标根 | `block_trading_server` | 未创建，未来由根 Gradle Build 聚合 | 仅承载 `block_trading_user_interface`、`block_trading_application`、`block_trading_domain`、`block_trading_infrastructure` 与 `block_trading_system_test` |
+| 后端目标根 | `block_trading_server` | 已建立四层与 R1 周期聚合模块，待层内按领域渐进迁移 | 固定保留 UserInterface/Application/Domain/Infrastructure 四个一级层；各层内部按限界上下文或稳定入口能力使用 API/Adapter/Test/Boot，System Test 独立验证 |
 | 前端目标根 | `block_trading_client` | 未创建，不进入 Gradle Build | R1 管理 Web 移动、小程序与 `block_trading_web_pc_admin`；R3 管理 Android/iOS；R4 管理 `block_trading_web_pc_user` 与平板终端工程 |
 | 部署与运维目标根 | `block_trading_deployment` | 未创建，按实际部署单元增量建立 | 只消费后端 `*_boot` 与前端发布产物，管理部署清单、镜像、环境差异、数据库迁移、发布/回滚脚本和日志归档作业 |
 | 前端原型入口 | `block_trading_docs/产品原型/shadcn-mobile/package.json` | 可执行 Vite 原型 | 作为 Web 移动、小程序、Android 与 iOS 的统一移动交互参考，不等同于生产工程 |
@@ -286,7 +286,7 @@ R1 受控内测的服务等级目标以连续 30 个自然日为统计窗口：�
 | 缓存/并发 | Redis | TTL、原子计数、分布式锁、限流和幂等实现成熟 | 锁必须有超时和补偿；库存最终以 Oracle 事实校验 |
 | 事件总线 | RabbitMQ | 已在项目栈内，适合审核、通知、索引、支付/物流回调和重试 | 使用 Outbox；按领域 exchange/routing key；失败进入死信队列 |
 | 对象存储 | MinIO | 自建环境适配媒体和证据；支持生命周期和签名访问 | 原始对象不直接暴露；病毒扫描、内容摘要和权限检查前置 |
-| 搜索 | OpenSearch | 支持中文全文、结构化过滤、区域/校区字段和排序派生 | R1 只做规则排序；索引不是权限源；规模不足时可先保留单集群 |
+| 搜索 | OpenSearch | 支持中文全文、结构化过滤、区域/校区字段、排序派生及 R3 可开关的 `knn_vector` 混合检索 | R1 只做规则排序；R3 在同一受控集群使用独立向量索引和别名切换，索引不是权限源；不引入第二个向量数据库 |
 | 分析 | ClickHouse（R3 起） | 适合事件明细、区域指标和时间窗口聚合 | R1/R2 先写 Oracle 事件；不把 ClickHouse 当交易源 |
 | 规则/模型编排 | Java 规则评估 + Spring Embabel + 模型适配网关 | R1 规则链可解释，后期可接大模型、风控和推荐模型 | 模型版本、输入摘要、人工覆盖和关闭开关必须落事实表；供应商可替换 |
 | 工作流 | 领域状态机 + Outbox/RabbitMQ | R1/R2 状态数量可控，减少引入新工作流平台 | R3 复杂跨区域长流程达到运维阈值后再评估 Temporal/Camunda，不在 R1 强制引入 |
@@ -332,14 +332,14 @@ R1 受控内测的服务等级目标以连续 30 个自然日为统计窗口：�
 |---|---|---|
 | R1 | UserInterface 入口、模块化单体、Oracle/Redis/RabbitMQ/MinIO、OpenSearch 基础索引；仅对 R1 已启用领域建设 ContextSnapshot/Outbox/Inbox、召回前可见性、审核控制回执与安全降级、后台 RBAC、商城订单与单区域白名单基础支付、增长权益账本、审核模型目录、OpenTelemetry、六类运行仪表盘、SLO 采集、P1-P3 告警与演练 Runbook；仅为已确认的独立部署单元创建所属业务 `*_boot` 与部署资产 | 多区域共享库存、规模化收款、自动退款、完整履约、个性化模型、分级封禁、复杂工作流平台，以及 R2-R4 未启用领域的空模块、消费者、专用存储和部署清单 |
 | R2 | 交易/履约模块独立扩缩选项、拼单结算桥接、支付回调/对账、区域可售与库存、物流接入、履约状态回传、售后证据、关键通知送达、补偿任务和交易看板；按需新增 commerce/fulfillment 部署资产 | 多区域共享库存、第三方商家、复杂优惠券、自动化风控决策 |
-| R3 | 审批后的区域配置模板、灰度、ClickHouse 指标、实验曝光/分桶、触达频控、数据主体请求、留存、法律保留、备份恢复演练；按需新增 analytics/discovery 部署资产 | 全国复杂定价、开放商家、完全自动审核、不可解释画像 |
+| R3 | 审批后的区域配置模板、灰度、ClickHouse 指标、实验曝光/分桶、触达频控、数据主体请求、留存、法律保留、备份恢复演练，以及默认关闭的向量/关键词混合检索；按需新增 analytics/discovery 部署资产 | 全国复杂定价、开放商家、完全自动审核、不可解释画像 |
 | R4 | 风控/推荐/模型网关独立扩展、封禁案件和申诉、关联图谱、模型审计、侵权流程与实验护栏；按需新增 trust_safety 部署资产 | 未经独立评审的直播、竞价、复杂营销叠加和开放式群聊 |
 
 ## 11. 技术选型决策与验收
 
 ### 11.1 必须遵守的架构决策
 
-- 模块化单体不是共享数据库脚本：每个已启用领域必须有自己的应用服务、仓储端口、事务边界、本域 ContextSnapshot/Outbox/Inbox 和事件消费者；外部请求只能经 UserInterface，领域间通过版本化 API 或 Outbox/Inbox 协作；后续领域只保留版本化契约和默认关闭的 Stub，不预建空 Boot 或运行时依赖。
+- 模块化单体不是共享数据库脚本：UserInterface/Application/Domain/Infrastructure 是稳定的一级分层接口，限界上下文在 Application、Domain 和 Infrastructure 层内形成代码所有权，UserInterface 按 gateway/callback/realtime 等稳定入口能力组织；各业务模块保留 API/Adapter/Test/Boot 结构。R1-R4 只作为交付元数据，不得成为模块、包、Repository、Boot 或测试名称。每个已启用领域必须有自己的应用服务、仓储端口、事务边界、本域 ContextSnapshot/Outbox/Inbox 和事件消费者；外部请求只能经 UserInterface Adapter，领域间通过版本化 Application API 或 Outbox/Inbox 协作。
 - 事件不是状态替代品：订单、审核、支付、库存和封禁主状态由所属领域维护，事件用于传播和追加处理事实。
 - 搜索、推荐、缓存、ClickHouse 和模型服务均为派生能力；搜索/推荐必须在召回前获得可见性约束、返回前复核，任何读模型不可作为权限或交易最终依据。
 - 所有扩容或拆服务都必须保持业务 ID、事件 ID、幂等键、快照引用和审计查询兼容。

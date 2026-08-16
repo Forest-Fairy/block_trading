@@ -1,0 +1,618 @@
+openapi: 3.1.0
+info:
+  title: 趣汇 R1 受控内测 API
+  version: 1.0.0-r1
+  description: 业务模块文档的机器可读基线；实现后由 R1 Boot 在 /v3/api-docs 暴露同语义契约。
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/client/v1/auth/sessions:
+    post:
+      operationId: login
+      tags: [identity]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/LoginRequest'}
+      responses:
+        '200': {description: 会话创建成功, content: {application/json: {schema: {$ref: '#/components/schemas/Session'}}}}
+        '401': {$ref: '#/components/responses/ApiError'}
+  /api/client/v1/auth/session:
+    get:
+      operationId: currentSession
+      tags: [identity]
+      responses:
+        '200': {description: 当前会话, content: {application/json: {schema: {$ref: '#/components/schemas/Session'}}}}
+    delete:
+      operationId: logout
+      tags: [identity]
+      security: [{bearerAuth: []}]
+      responses: {'204': {description: 已撤销或原本不存在}}
+  /api/client/v1/assets:
+    post:
+      operationId: uploadAsset
+      tags: [governance]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [assetType, file]
+              properties:
+                assetType: {type: string, enum: [PROFILE_AVATAR, POST_MEDIA, STUDENT_PROOF, REPORT_EVIDENCE]}
+                file: {type: string, format: binary}
+      responses:
+        '200': {description: MinIO 对象与 Oracle 资产登记成功}
+        '400': {$ref: '#/components/responses/ApiError'}
+        '401': {$ref: '#/components/responses/ApiError'}
+  /api/client/v1/assets/{assetId}/access:
+    get:
+      operationId: accessAsset
+      tags: [governance]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: assetId, in: path, required: true, schema: {type: integer, format: int64, minimum: 1}}
+      responses:
+        '200': {description: 仅创建者可获取 5 分钟签名 URL}
+        '403': {$ref: '#/components/responses/ApiError'}
+        '404': {$ref: '#/components/responses/ApiError'}
+  /api/client/v1/identity/student-verification:
+    get:
+      operationId: currentStudentVerification
+      tags: [identity]
+      security: [{bearerAuth: []}]
+      responses: {'200': {description: 仅当前用户可见的认证状态}, '404': {$ref: '#/components/responses/ApiError'}}
+    delete:
+      operationId: revokeStudentVerification
+      tags: [identity]
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      responses: {'200': {description: 已撤销并关闭校园模式}, '409': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/identity/student-verifications:
+    post:
+      operationId: submitStudentVerification
+      tags: [identity]
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/StudentVerificationSubmitRequest'}}}
+      responses: {'200': {description: 已进入待审核}, '409': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/identity/campus-mode:
+    put:
+      operationId: setCampusMode
+      tags: [identity]
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [enabled], properties: {enabled: {type: boolean}}}}}
+      responses: {'200': {description: 服务端认证裁决后的资料}, '403': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/visibility/blocks/{targetUserId}:
+    put:
+      operationId: blockUser
+      tags: [visibility]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: targetUserId, in: path, required: true, schema: {type: integer, format: int64}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      responses: {'200': {description: 拉黑关系与可见性版本已更新}}
+    delete:
+      operationId: unblockUser
+      tags: [visibility]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: targetUserId, in: path, required: true, schema: {type: integer, format: int64}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      responses: {'200': {description: 拉黑关系与可见性版本已更新}}
+  /api/client/v1/discovery/feed:
+    get:
+      operationId: feed
+      tags: [discovery]
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/PageSize'}]
+      responses: {'200': {description: 已做范围复核的信息流, content: {application/json: {schema: {$ref: '#/components/schemas/Page'}}}}}
+  /api/client/v1/discovery/search:
+    get:
+      operationId: search
+      tags: [discovery]
+      parameters:
+        - {name: q, in: query, required: true, schema: {type: string, minLength: 1, maxLength: 100}}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses: {'200': {description: 已做范围复核的搜索结果, content: {application/json: {schema: {$ref: '#/components/schemas/Page'}}}}}
+  /api/client/v1/discovery/feedback:
+    post:
+      operationId: discoveryFeedback
+      tags: [discovery]
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contentType, contentId, action]
+              properties:
+                contentType: {type: string}
+                contentId: {type: string}
+                action: {type: string, enum: [HIDE, REDUCE_SIMILAR, UNDO]}
+      responses: {'200': {description: 已应用}, '409': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/community/posts:
+    get:
+      operationId: listPosts
+      tags: [community]
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/PageSize'}]
+      responses: {'200': {description: 已过滤帖子, content: {application/json: {schema: {$ref: '#/components/schemas/Page'}}}}}
+  /api/client/v1/community/posts/{postId}:
+    get:
+      operationId: getPost
+      tags: [community]
+      parameters: [{name: postId, in: path, required: true, schema: {type: string}}]
+      responses: {'200': {description: 可见详情}, '404': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/community/posts/{postId}/comments:
+    get:
+      operationId: listPostComments
+      tags: [community]
+      parameters:
+        - {name: postId, in: path, required: true, schema: {type: integer, format: int64, minimum: 1}}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses: {'200': {description: 帖子可见性复核后的评论与一级回复}, '404': {$ref: '#/components/responses/ApiError'}}
+    post:
+      operationId: createPostComment
+      tags: [community]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: postId, in: path, required: true, schema: {type: integer, format: int64, minimum: 1}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/CommentCreateRequest'}}}
+      responses: {'200': {description: 评论已进入审核状态}, '409': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/community/posts/{postId}/shares:
+    post:
+      operationId: createPostShare
+      tags: [community]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: postId, in: path, required: true, schema: {type: integer, format: int64, minimum: 1}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/ShareCreateRequest'}}}
+      responses: {'200': {description: 七天有效的分享码}, '404': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/community/shares/{shareCode}:
+    get:
+      operationId: resolvePostShare
+      tags: [community]
+      parameters:
+        - {name: shareCode, in: path, required: true, schema: {type: string, minLength: 16, maxLength: 64}}
+      responses: {'200': {description: 落地时按当前主体重新裁决的帖子}, '404': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/governance/reports:
+    post:
+      operationId: submitReport
+      tags: [governance]
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/ReportCreateRequest'}}}
+      responses: {'200': {description: 举报与区域审核案件已原子创建}, '409': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/community/posts/{postId}/participants:
+    post:
+      operationId: joinPost
+      tags: [community]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: postId, in: path, required: true, schema: {type: string}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/VersionedJoinRequest'}}}
+      responses: {'200': {description: 参与成功}, '409': {$ref: '#/components/responses/ApiError'}}
+    delete:
+      operationId: leavePost
+      tags: [community]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: postId, in: path, required: true, schema: {type: integer, format: int64}}
+        - {name: expectedVersion, in: query, required: true, schema: {type: integer, format: int64, minimum: 0}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      responses: {'200': {description: 已退出参与}, '409': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/community/drafts/{draftId}:
+    put:
+      operationId: saveCommunityDraft
+      tags: [community]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: draftId, in: path, required: true, schema: {type: integer, format: int64}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/CommunityDraftRequest'}}}
+      responses: {'200': {description: 草稿已保存}}
+  /api/client/v1/community/drafts/{draftId}/submit:
+    post:
+      operationId: submitCommunityDraft
+      tags: [community]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: draftId, in: path, required: true, schema: {type: integer, format: int64}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/VersionedJoinRequest'}}}
+      responses: {'200': {description: 正式帖子与审核事实已原子创建}, '409': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/commerce/products:
+    get:
+      operationId: listProducts
+      tags: [commerce]
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/PageSize'}]
+      responses: {'200': {description: 商品列表, content: {application/json: {schema: {$ref: '#/components/schemas/Page'}}}}}
+  /api/client/v1/commerce/products/{productId}:
+    get:
+      operationId: getProduct
+      tags: [commerce]
+      parameters: [{name: productId, in: path, required: true, schema: {type: integer, format: int64}}]
+      responses: {'200': {description: 商品详情}, '404': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/commerce/cart:
+    get:
+      operationId: getCart
+      tags: [commerce]
+      security: [{bearerAuth: []}]
+      responses: {'200': {description: 当前购物车}}
+  /api/client/v1/commerce/cart/items:
+    post:
+      operationId: addCartItem
+      tags: [commerce]
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/SkuQuantityRequest'}}}
+      responses: {'200': {description: 已加购}, '401': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/commerce/orders:
+    post:
+      operationId: confirmOrder
+      tags: [commerce]
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/SkuQuantityRequest'}}}
+      responses: {'200': {description: 新建或返回相同订单}, '409': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/commerce/orders/{orderId}:
+    get:
+      operationId: getOrder
+      tags: [commerce]
+      security: [{bearerAuth: []}]
+      parameters: [{name: orderId, in: path, required: true, schema: {type: integer, format: int64}}]
+      responses: {'200': {description: 当前用户订单}, '404': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/commerce/orders/{orderId}/payments:
+    post:
+      operationId: startPayment
+      tags: [commerce]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: orderId, in: path, required: true, schema: {type: integer, format: int64}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      responses: {'200': {description: 支付事实已幂等创建；返回当前订单快照，最终状态以 Provider 回调后的订单查询为准}, '409': {$ref: '#/components/responses/ApiError'}}
+  /api/provider/v1/payments/callbacks/{channel}:
+    post:
+      operationId: paymentCallback
+      tags: [provider-callback]
+      parameters:
+        - {name: channel, in: path, required: true, schema: {type: string}}
+        - {name: X-Payment-Signature, in: header, required: true, schema: {type: string, pattern: '^[0-9a-fA-F]{64}$'}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/PaymentCallbackRequest'}}}
+      responses:
+        '200': {description: 已接收或重复事件}
+        '401': {$ref: '#/components/responses/ApiError'}
+        '409': {$ref: '#/components/responses/ApiError'}
+  /api/client/v1/engagement/summary:
+    get:
+      operationId: messageSummary
+      tags: [engagement]
+      responses: {'200': {description: 分类型未读摘要}}
+  /api/client/v1/engagement/conversations:
+    get:
+      operationId: listConversations
+      tags: [engagement]
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/PageSize'}]
+      responses: {'200': {description: 当前用户会话列表}}
+  /api/client/v1/engagement/conversations/{conversationId}/messages:
+    get:
+      operationId: listMessages
+      tags: [engagement]
+      security: [{bearerAuth: []}]
+      parameters: [{name: conversationId, in: path, required: true, schema: {type: string}}]
+      responses: {'200': {description: 可见消息缺口}}
+    post:
+      operationId: sendMessage
+      tags: [engagement]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: conversationId, in: path, required: true, schema: {type: string}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/SendMessageRequest'}}}
+      responses: {'200': {description: 已存储}, '409': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/engagement/support-tickets:
+    post:
+      operationId: createSupportTicket
+      tags: [engagement]
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/SupportTicketRequest'}}}
+      responses: {'200': {description: 工单已按区域路由}}
+  /api/client/v1/profile/me:
+    get:
+      operationId: profile
+      tags: [profile]
+      security: [{bearerAuth: []}]
+      responses: {'200': {description: 当前主体资料}}
+    patch:
+      operationId: updateProfile
+      tags: [profile]
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/ProfileUpdateRequest'}}}
+      responses: {'200': {description: 已保存}, '409': {$ref: '#/components/responses/ApiError'}}
+  /api/client/v1/profile/benefits:
+    get:
+      operationId: profileBenefits
+      tags: [profile]
+      security: [{bearerAuth: []}]
+      responses: {'200': {description: 当前权益事实}}
+  /api/client/v1/profile/check-ins:
+    post:
+      operationId: dailyCheckIn
+      tags: [profile]
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      responses: {'200': {description: 当日签到结果}}
+  /api/client/v1/profile/redemptions:
+    post:
+      operationId: redeemBenefitCode
+      tags: [profile]
+      security: [{bearerAuth: []}]
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object, required: [code], properties: {code: {type: string, minLength: 4, maxLength: 64}}}}}
+      responses: {'200': {description: 兑换结果与最新权益}, '409': {$ref: '#/components/responses/ApiError'}}
+  /api/admin/v1/capabilities:
+    get:
+      operationId: adminCapabilities
+      tags: [admin]
+      security: [{bearerAuth: []}]
+      responses: {'200': {description: 服务端能力清单}, '403': {$ref: '#/components/responses/ApiError'}}
+  /api/admin/v1/mfa/challenges:
+    post:
+      operationId: issueMfaChallenge
+      tags: [admin]
+      security: [{bearerAuth: []}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/MfaChallengeIssueRequest'}}}
+      responses: {'200': {description: OTP 已经独立通道交付；仅 DEV 显式开关可附带测试码}, '403': {$ref: '#/components/responses/ApiError'}}
+  /api/admin/v1/mfa/challenges/{challengeId}/verify:
+    post:
+      operationId: verifyMfaChallenge
+      tags: [admin]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: challengeId, in: path, required: true, schema: {type: string, minLength: 16, maxLength: 64}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/MfaChallengeVerifyRequest'}}}
+      responses: {'200': {description: 挑战已通过且尚未消费}, '403': {$ref: '#/components/responses/ApiError'}}
+  /api/admin/v1/student-verifications:
+    get:
+      operationId: listStudentVerifications
+      tags: [admin]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: status, in: query, required: false, schema: {type: string, enum: [PENDING, VERIFIED, REJECTED, REVOKED]}}
+        - {name: campusId, in: query, required: false, schema: {type: integer, format: int64, minimum: 1}}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses: {'200': {description: 已按授权范围过滤的认证队列}, '403': {$ref: '#/components/responses/ApiError'}}
+  /api/admin/v1/student-verifications/{verificationId}/decision:
+    post:
+      operationId: decideStudentVerification
+      tags: [admin]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: verificationId, in: path, required: true, schema: {type: integer, format: int64, minimum: 1}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+        - {name: X-MFA-Challenge, in: header, required: true, schema: {type: string, minLength: 16, maxLength: 64}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/StudentVerificationDecisionRequest'}}}
+      responses: {'200': {description: 挑战已一次性消费且审核结果已记录}, '403': {$ref: '#/components/responses/ApiError'}, '409': {$ref: '#/components/responses/ApiError'}}
+  /api/admin/v1/moderation/cases:
+    get:
+      operationId: listModerationCases
+      tags: [admin]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: status, in: query, required: false, schema: {type: string}}
+        - {name: regionId, in: query, required: false, schema: {type: integer, format: int64}}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {$ref: '#/components/parameters/PageSize'}
+      responses: {'200': {description: 已按数据范围过滤的审核队列}, '403': {$ref: '#/components/responses/ApiError'}}
+  /api/admin/v1/moderation/cases/{caseId}/decisions:
+    post:
+      operationId: decideModeration
+      tags: [admin]
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: caseId, in: path, required: true, schema: {type: string}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+        - {name: X-MFA-Challenge, in: header, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/ModerationDecisionRequest'}}}
+      responses: {'200': {description: 裁决已记录}, '403': {$ref: '#/components/responses/ApiError'}}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: opaque}
+  parameters:
+    Cursor: {name: cursor, in: query, required: false, schema: {type: string, maxLength: 512}}
+    PageSize: {name: pageSize, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 50, default: 20}}
+    IdempotencyKey: {name: Idempotency-Key, in: header, required: true, schema: {type: string, minLength: 8, maxLength: 128}}
+  responses:
+    ApiError:
+      description: 失败关闭错误
+      content: {application/json: {schema: {$ref: '#/components/schemas/ApiError'}}}
+  schemas:
+    CommunityDraftRequest:
+      type: object
+      required: [type]
+      properties:
+        type: {type: string, enum: [GROUP_BUY, CARPOOL, OFFLINE_TEAM, ONLINE_TEAM, NEIGHBOR_HELP]}
+        title: {type: [string, 'null'], maxLength: 120}
+        content: {type: [string, 'null'], maxLength: 4000}
+    CommentCreateRequest:
+      type: object
+      required: [content]
+      properties:
+        parentCommentId: {type: [integer, 'null'], format: int64, minimum: 1}
+        content: {type: string, minLength: 1, maxLength: 2000}
+      additionalProperties: false
+    ShareCreateRequest:
+      type: object
+      required: [channel]
+      properties:
+        channel: {type: string, enum: [COPY_LINK, WECHAT, MINI_PROGRAM]}
+      additionalProperties: false
+    ReportCreateRequest:
+      type: object
+      required: [targetType, targetId, reasonCode]
+      properties:
+        targetType: {type: string, enum: [POST, COMMENT, USER]}
+        targetId: {type: integer, format: int64, minimum: 1}
+        reasonCode: {type: string, minLength: 1, maxLength: 32}
+        description: {type: [string, 'null'], maxLength: 1000}
+        evidenceAssetId: {type: [integer, 'null'], format: int64, minimum: 1}
+      additionalProperties: false
+    SupportTicketRequest:
+      type: object
+      required: [category, content]
+      properties:
+        category: {type: string, minLength: 1, maxLength: 40}
+        content: {type: string, minLength: 1, maxLength: 4000}
+        regionId: {type: [integer, 'null'], format: int64}
+    LoginRequest:
+      type: object
+      required: [login, password, deviceId]
+      properties: {login: {type: string}, password: {type: string, format: password}, deviceId: {type: string}}
+      additionalProperties: false
+    VersionedJoinRequest:
+      type: object
+      required: [expectedVersion]
+      properties: {expectedVersion: {type: integer, format: int64, minimum: 0}}
+      additionalProperties: false
+    SkuQuantityRequest:
+      type: object
+      required: [skuId, quantity]
+      properties:
+        skuId: {type: integer, format: int64, minimum: 1}
+        quantity: {type: integer, minimum: 1, maximum: 999}
+      additionalProperties: false
+    PaymentCallbackRequest:
+      type: object
+      required: [eventId, orderId, amountCent, status, payload]
+      properties:
+        eventId: {type: string, minLength: 1, maxLength: 128}
+        orderId: {type: integer, format: int64, minimum: 1}
+        amountCent: {type: integer, format: int64, minimum: 0}
+        status: {type: string, enum: [PENDING, SUCCEEDED, FAILED]}
+        payload: {type: string, minLength: 2, maxLength: 65536}
+      additionalProperties: false
+    SendMessageRequest:
+      type: object
+      required: [clientMessageId, kind, content]
+      properties:
+        clientMessageId: {type: string, minLength: 8, maxLength: 128}
+        kind: {type: string, enum: [TEXT, IMAGE, VOICE, BUSINESS_CARD]}
+        content: {type: string, minLength: 1, maxLength: 4000}
+      additionalProperties: false
+    ProfileUpdateRequest:
+      type: object
+      required: [expectedVersion]
+      properties:
+        nickname: {type: [string, 'null'], maxLength: 60}
+        username: {type: [string, 'null'], maxLength: 60}
+        signature: {type: [string, 'null'], maxLength: 240}
+        expectedVersion: {type: integer, format: int64, minimum: 0}
+      additionalProperties: false
+    StudentVerificationSubmitRequest:
+      type: object
+      required: [campusId, assetId, studentNo]
+      properties:
+        campusId: {type: integer, format: int64, minimum: 1}
+        assetId: {type: integer, format: int64, minimum: 1}
+        studentNo: {type: string, minLength: 4, maxLength: 64}
+      additionalProperties: false
+    StudentVerificationDecisionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision: {type: string, enum: [APPROVE, REJECT]}
+        reason: {type: [string, 'null'], maxLength: 500}
+      additionalProperties: false
+    MfaChallengeIssueRequest:
+      type: object
+      required: [sceneType]
+      properties:
+        sceneType: {type: string, enum: [MODERATION_DECIDE, STUDENT_VERIFICATION_DECIDE]}
+      additionalProperties: false
+    MfaChallengeVerifyRequest:
+      type: object
+      required: [otpCode]
+      properties:
+        otpCode: {type: string, pattern: '^[0-9]{6}$'}
+      additionalProperties: false
+    ModerationDecisionRequest:
+      type: object
+      required: [decision, reasonCode]
+      properties:
+        decision: {type: string, enum: [APPROVE, REJECT, ESCALATE]}
+        reasonCode: {type: string, minLength: 1, maxLength: 64}
+      additionalProperties: false
+    Session:
+      type: object
+      required: [status]
+      properties:
+        status: {type: string, enum: [ANONYMOUS, ACTIVE, REVOKED, EXPIRED]}
+        accessToken: {type: string}
+        expiresIn: {type: integer}
+        roles: {type: array, items: {type: string, enum: [SYSTEM_ADMIN, OPERATION_ADMIN, REGION_ADMIN]}}
+    Page:
+      type: object
+      required: [items]
+      properties: {items: {type: array, items: {type: object}}, nextCursor: {type: [string, 'null']}}
+    ApiError:
+      type: object
+      required: [code, message, requestId, retryable]
+      properties:
+        code: {type: string, enum: [AUTH_REQUIRED, FORBIDDEN_SCOPE, VALIDATION_FAILED, NOT_FOUND_OR_HIDDEN, CONFLICT, STATE_CONFLICT, RATE_LIMITED, MFA_REQUIRED, MFA_INVALID, MFA_EXPIRED, SIGNATURE_INVALID, PAYMENT_MISMATCH, PROVIDER_UNAVAILABLE, DEPENDENCY_UNAVAILABLE]}
+        message: {type: string}
+        requestId: {type: string}
+        retryable: {type: boolean}
+        details: {type: object}
+      additionalProperties: false
